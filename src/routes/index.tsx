@@ -1,416 +1,385 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { createParser } from "eventsource-parser";
-import type { OrbState } from "@/components/Orb";
-
-// Lazy-load the heavy 3D Orb so it doesn't bloat the initial bundle.
-const Orb = lazy(() => import("@/components/Orb"));
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "JARVIS — Advanced AI" },
-      { name: "description", content: "JARVIS: voice-first AI assistant with the GHOST core." },
-      { property: "og:title", content: "JARVIS — Advanced AI" },
-      { property: "og:description", content: "JARVIS: voice-first AI assistant with the GHOST core." },
+      { title: "Autonomous Self-Learning 3D Build Simulation" },
+      {
+        name: "description",
+        content:
+          "A recursive self-learning physics simulation that records lessons and mutates its runtime schema.",
+      },
+      { property: "og:title", content: "Autonomous Self-Learning 3D Build Simulation" },
+      {
+        property: "og:description",
+        content:
+          "A recursive self-learning physics simulation that records lessons and mutates its runtime schema.",
+      },
     ],
   }),
   component: Index,
 });
 
-type Msg = { role: "user" | "assistant"; content: string };
+type BuildSchema = {
+  generation: number;
+  cubeSpeedX: number;
+  cubeSpeedY: number;
+  gravityForce: number;
+  bounceElasticity: number;
+  velocityThreshold: number;
+};
 
-function Index() {
-  const [messages, setMessages] = useState<Msg[]>([]);
-  const [input, setInput] = useState("");
-  const [orbState, setOrbState] = useState<OrbState>("idle");
-  const [level, setLevel] = useState(0);
-  const [streaming, setStreaming] = useState("");
-  const [error, setError] = useState<string | null>(null);
+type LearningResponse = {
+  lessonLearned?: string;
+  newSchema?: Partial<BuildSchema>;
+};
 
-  // Recording
-  const recRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const [recording, setRecording] = useState(false);
+const initialSchema: BuildSchema = {
+  generation: 1,
+  cubeSpeedX: 0.02,
+  cubeSpeedY: 0.01,
+  gravityForce: 0.05,
+  bounceElasticity: 0.6,
+  velocityThreshold: 0.1,
+};
 
-  // Audio playback graph (persistent so we can analyse amplitude)
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const gainRef = useRef<GainNode | null>(null);
+const initialMemory =
+  "System initialized. Objective: Learn parameters to keep the build animating inside canvas bounds without clipping.";
 
-  const ensureAudio = useCallback(async () => {
-    if (!audioCtxRef.current) {
-      const ctx = new AudioContext({ sampleRate: 24000 });
-      const gain = ctx.createGain();
-      const an = ctx.createAnalyser();
-      an.fftSize = 512;
-      gain.connect(an);
-      an.connect(ctx.destination);
-      audioCtxRef.current = ctx;
-      gainRef.current = gain;
-      analyserRef.current = an;
-    }
-    const ctx = audioCtxRef.current!;
-    if (ctx.state === "suspended") await ctx.resume().catch(() => {});
-    return ctx;
-  }, []);
-
-  // Continuous amplitude poll → orb level
-  useEffect(() => {
-    let raf = 0;
-    const buf = new Uint8Array(256);
-    const loop = () => {
-      const an = analyserRef.current;
-      if (an) {
-        an.getByteTimeDomainData(buf);
-        let sum = 0;
-        for (let i = 0; i < buf.length; i++) {
-          const v = (buf[i] - 128) / 128;
-          sum += v * v;
-        }
-        const rms = Math.sqrt(sum / buf.length);
-        setLevel((prev) => prev * 0.6 + Math.min(1, rms * 3) * 0.4);
-      } else {
-        setLevel((prev) => prev * 0.85);
-      }
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-
-  const speak = useCallback(
-    async (text: string) => {
-      const ctx = await ensureAudio();
-      const gain = gainRef.current!;
-      setOrbState("speaking");
-
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      if (!res.ok || !res.body) {
-        setError(`TTS failed (${res.status})`);
-        setOrbState("idle");
-        return;
-      }
-
-      let playhead = 0;
-      let pending = new Uint8Array(0);
-      let lastEndsAt = 0;
-
-      const playChunk = (incoming: Uint8Array) => {
-        const bytes = new Uint8Array(pending.length + incoming.length);
-        bytes.set(pending);
-        bytes.set(incoming, pending.length);
-        const usable = bytes.length - (bytes.length % 2);
-        pending = bytes.slice(usable);
-        if (!usable) return;
-        const samples = new Int16Array(bytes.buffer, 0, usable / 2);
-        const floats = Float32Array.from(samples, (s) => s / 32768);
-        const buffer = ctx.createBuffer(1, floats.length, 24000);
-        buffer.copyToChannel(floats, 0);
-        const src = ctx.createBufferSource();
-        src.buffer = buffer;
-        src.connect(gain);
-        if (playhead === 0) playhead = ctx.currentTime + 0.08;
-        else playhead = Math.max(playhead, ctx.currentTime);
-        src.start(playhead);
-        playhead += buffer.duration;
-        lastEndsAt = playhead;
-      };
-
-      const parser = createParser({
-        onEvent(ev) {
-          let p: { type: string; audio?: string };
-          try {
-            p = JSON.parse(ev.data);
-          } catch {
-            return;
-          }
-          if (p.type !== "speech.audio.delta" || !p.audio) return;
-          const bin = atob(p.audio);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          playChunk(bytes);
-        },
-      });
-
-      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          parser.feed(value);
-        }
-      } finally {
-        reader.cancel().catch(() => {});
-      }
-
-      const waitMs = Math.max(0, (lastEndsAt - ctx.currentTime) * 1000 + 200);
-      window.setTimeout(() => setOrbState("idle"), waitMs);
-    },
-    [ensureAudio],
-  );
-
-  const send = useCallback(
-    async (text: string) => {
-      const clean = text.trim();
-      if (!clean) return;
-      setError(null);
-      const next: Msg[] = [...messages, { role: "user", content: clean }];
-      setMessages(next);
-      setInput("");
-      setOrbState("thinking");
-      setStreaming("");
-
-      let full = "";
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: next }),
-        });
-        if (!res.ok || !res.body) throw new Error(`Chat ${res.status}`);
-
-        const parser = createParser({
-          onEvent(ev) {
-            if (ev.data === "[DONE]") return;
-            try {
-              const j = JSON.parse(ev.data);
-              const delta = j.choices?.[0]?.delta?.content ?? "";
-              if (delta) {
-                full += delta;
-                setStreaming(full);
-              }
-            } catch {
-              /* ignore */
-            }
-          },
-        });
-        const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          parser.feed(value);
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Request failed");
-        setOrbState("idle");
-        return;
-      }
-
-      setMessages((m) => [...m, { role: "assistant", content: full }]);
-      setStreaming("");
-      if (full.trim()) await speak(full);
-      else setOrbState("idle");
-    },
-    [messages, speak],
-  );
-
-  const startRecording = useCallback(async () => {
-    setError(null);
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      setError("Microphone access denied.");
-      return;
-    }
-    const mime = ["audio/webm", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported(t));
-    if (!mime) {
-      stream.getTracks().forEach((t) => t.stop());
-      setError("Browser cannot record a supported audio format.");
-      return;
-    }
-    const rec = new MediaRecorder(stream, { mimeType: mime });
-    chunksRef.current = [];
-    rec.ondataavailable = (e) => {
-      if (e.data.size) chunksRef.current.push(e.data);
-    };
-    rec.onstop = async () => {
-      stream.getTracks().forEach((t) => t.stop());
-      const blob = new Blob(chunksRef.current, { type: rec.mimeType });
-      setOrbState("thinking");
-      if (blob.size < 1024) {
-        setError("Recording too short — try again.");
-        setOrbState("idle");
-        return;
-      }
-      const fd = new FormData();
-      fd.append("file", blob, `r.${mime === "audio/mp4" ? "mp4" : "webm"}`);
-      const res = await fetch("/api/stt", { method: "POST", body: fd });
-      if (!res.ok) {
-        setError(`Transcription failed (${res.status})`);
-        setOrbState("idle");
-        return;
-      }
-      const { text } = (await res.json()) as { text: string };
-      if (text?.trim()) await send(text);
-      else setOrbState("idle");
-    };
-    recRef.current = rec;
-    rec.start();
-    setRecording(true);
-    setOrbState("listening");
-  }, [send]);
-
-  const stopRecording = useCallback(() => {
-    recRef.current?.stop();
-    recRef.current = null;
-    setRecording(false);
-  }, []);
-
-  // metric flicker for HUD
-  const [metrics, setMetrics] = useState({ cpu: 32, mem: 48, ping: 14 });
-  useEffect(() => {
-    const id = setInterval(() => {
-      setMetrics({
-        cpu: 20 + Math.round(Math.random() * 60),
-        mem: 30 + Math.round(Math.random() * 50),
-        ping: 8 + Math.round(Math.random() * 22),
-      });
-    }, 1400);
-    return () => clearInterval(id);
-  }, []);
-
-  const statusLabel =
-    orbState === "speaking"
-      ? "RESPONDING"
-      : orbState === "thinking"
-        ? "PROCESSING"
-        : orbState === "listening"
-          ? "LISTENING"
-          : "STANDBY";
-
-  return (
-    <div className="min-h-screen w-full hud-grid">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-6 md:px-8">
-        {/* Top bar */}
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-2 w-2 rounded-full bg-[var(--orb-amber)] shadow-[0_0_10px_var(--orb-amber)]" />
-            <h1 className="font-mono text-sm tracking-[0.4em] text-[var(--orb-amber)]">
-              J A R V I S
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="hud-chip">CPU {metrics.cpu}%</span>
-            <span className="hud-chip hidden sm:inline">MEM {metrics.mem}%</span>
-            <span className="hud-chip hidden sm:inline">PING {metrics.ping}ms</span>
-            <span className="hud-chip">{statusLabel}</span>
-          </div>
-        </header>
-
-        {/* Orb */}
-        <section className="my-6 flex flex-1 items-center justify-center">
-          <Suspense
-            fallback={
-              <div className="flex h-64 w-64 items-center justify-center font-mono text-xs tracking-[0.4em] text-[var(--orb-amber)]/60">
-                BOOTING CORE…
-              </div>
-            }
-          >
-            <Orb state={orbState} level={level} />
-          </Suspense>
-        </section>
-
-        {/* Transcript */}
-        <section className="mb-4 max-h-56 overflow-y-auto rounded-lg border border-border bg-card/40 p-4 backdrop-blur-sm">
-          {messages.length === 0 && !streaming && (
-            <p className="text-center font-mono text-xs tracking-widest text-muted-foreground">
-              JARVIS ONLINE — SPEAK OR TYPE TO BEGIN
-            </p>
-          )}
-          <ul className="space-y-3">
-            {messages.map((m, i) => (
-              <li key={i} className="text-sm">
-                <span
-                  className={
-                    m.role === "user"
-                      ? "mr-2 font-mono text-xs tracking-widest text-muted-foreground"
-                      : "mr-2 font-mono text-xs tracking-widest text-[var(--orb-amber)]"
-                  }
-                >
-                  {m.role === "user" ? "YOU »" : "JARVIS »"}
-                </span>
-                <span className="text-foreground/90">{m.content}</span>
-              </li>
-            ))}
-            {streaming && (
-              <li className="text-sm">
-                <span className="mr-2 font-mono text-xs tracking-widest text-[var(--orb-amber)]">
-                  JARVIS »
-                </span>
-                <span className="text-foreground/90">{streaming}</span>
-              </li>
-            )}
-          </ul>
-        </section>
-
-        {/* Input row */}
-        <footer className="flex items-center gap-2">
-          <button
-            onClick={recording ? stopRecording : startRecording}
-            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition-all ${
-              recording
-                ? "border-[var(--orb-amber)] bg-[var(--orb-orange)]/30 shadow-[0_0_24px_var(--orb-amber)]"
-                : "border-border bg-card/60 hover:border-[var(--orb-amber)]"
-            }`}
-            aria-label={recording ? "Stop recording" : "Start recording"}
-          >
-            <MicIcon active={recording} />
-          </button>
-          <form
-            className="flex flex-1 items-center gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void send(input);
-            }}
-          >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Address JARVIS…"
-              disabled={orbState !== "idle" && orbState !== "listening"}
-              className="h-12 w-full rounded-full border border-border bg-card/60 px-5 font-mono text-sm tracking-wide text-foreground placeholder:text-muted-foreground/60 focus:border-[var(--orb-amber)] focus:outline-none disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={!input.trim() || orbState === "thinking" || orbState === "speaking"}
-              className="h-12 rounded-full border border-[var(--orb-amber)]/60 bg-[var(--orb-orange)]/20 px-5 font-mono text-xs tracking-widest text-[var(--orb-amber)] transition-all hover:bg-[var(--orb-orange)]/40 disabled:opacity-40"
-            >
-              SEND
-            </button>
-          </form>
-        </footer>
-
-        {error && (
-          <p className="mt-3 text-center font-mono text-xs tracking-wider text-destructive">
-            {error}
-          </p>
-        )}
-      </div>
-    </div>
-  );
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
-function MicIcon({ active }: { active: boolean }) {
+function sanitizeSchema(current: BuildSchema, incoming?: Partial<BuildSchema>): BuildSchema {
+  return {
+    generation: Math.max(
+      current.generation + 1,
+      Math.round(incoming?.generation ?? current.generation + 1),
+    ),
+    cubeSpeedX: clamp(Number(incoming?.cubeSpeedX ?? current.cubeSpeedX), 0.002, 0.08),
+    cubeSpeedY: clamp(Number(incoming?.cubeSpeedY ?? current.cubeSpeedY), 0.002, 0.08),
+    gravityForce: clamp(Number(incoming?.gravityForce ?? current.gravityForce), 0.005, 0.12),
+    bounceElasticity: clamp(
+      Number(incoming?.bounceElasticity ?? current.bounceElasticity),
+      0.1,
+      0.95,
+    ),
+    velocityThreshold: clamp(
+      Number(incoming?.velocityThreshold ?? current.velocityThreshold),
+      0.01,
+      0.3,
+    ),
+  };
+}
+
+function fallbackMutation(schema: BuildSchema, crashed: boolean): LearningResponse {
+  const next = sanitizeSchema(schema, {
+    generation: schema.generation + 1,
+    cubeSpeedX: schema.cubeSpeedX * (crashed ? 0.92 : 1.04),
+    cubeSpeedY: schema.cubeSpeedY * (crashed ? 0.95 : 1.03),
+    gravityForce: schema.gravityForce * (crashed ? 0.82 : 0.98),
+    bounceElasticity: schema.bounceElasticity + (crashed ? 0.08 : 0.02),
+    velocityThreshold: schema.velocityThreshold * (crashed ? 0.8 : 0.95),
+  });
+
+  return {
+    lessonLearned: crashed
+      ? `Generation ${schema.generation}: crash detected; lower gravity, raise elasticity, and reduce failure sensitivity.`
+      : `Generation ${schema.generation}: stable run; carefully increase kinetic motion while preserving rebound energy.`,
+    newSchema: next,
+  };
+}
+
+function Index() {
+  const [apiKey, setApiKey] = useState("");
+  const [buildSchema, setBuildSchema] = useState<BuildSchema>(initialSchema);
+  const [repoMemoryFile, setRepoMemoryFile] = useState([initialMemory]);
+  const [loopActive, setLoopActive] = useState(false);
+  const [isCrashed, setIsCrashed] = useState(false);
+  const [frameCount, setFrameCount] = useState(0);
+  const [successTicks, setSuccessTicks] = useState(0);
+  const [yPosition, setYPosition] = useState(0);
+  const [yVelocity, setYVelocity] = useState(0);
+  const [rotation, setRotation] = useState({ x: 0, y: 0 });
+  const [learningStatus, setLearningStatus] = useState("Telemetry: Processing...");
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [aiThinking, setAiThinking] = useState(false);
+
+  const schemaRef = useRef(buildSchema);
+  const loopActiveRef = useRef(loopActive);
+  const crashedRef = useRef(isCrashed);
+  const frameRef = useRef(frameCount);
+  const successRef = useRef(successTicks);
+  const yVelocityRef = useRef(yVelocity);
+  const memoryRef = useRef(repoMemoryFile);
+
+  useEffect(() => {
+    schemaRef.current = buildSchema;
+  }, [buildSchema]);
+
+  useEffect(() => {
+    loopActiveRef.current = loopActive;
+  }, [loopActive]);
+
+  useEffect(() => {
+    crashedRef.current = isCrashed;
+  }, [isCrashed]);
+
+  useEffect(() => {
+    frameRef.current = frameCount;
+  }, [frameCount]);
+
+  useEffect(() => {
+    successRef.current = successTicks;
+  }, [successTicks]);
+
+  useEffect(() => {
+    yVelocityRef.current = yVelocity;
+  }, [yVelocity]);
+
+  useEffect(() => {
+    memoryRef.current = repoMemoryFile;
+  }, [repoMemoryFile]);
+
+  const resetRuntime = useCallback(() => {
+    setYPosition(0);
+    setYVelocity(0);
+    setFrameCount(0);
+    setSuccessTicks(0);
+    setIsCrashed(false);
+    setLastError(null);
+  }, []);
+
+  const stopAI = useCallback(() => {
+    setLoopActive(false);
+    setAiThinking(false);
+  }, []);
+
+  const applyLearning = useCallback(
+    (learning: LearningResponse, crashed: boolean) => {
+      setBuildSchema((current) => sanitizeSchema(current, learning.newSchema));
+      setRepoMemoryFile((memory) => [
+        ...memory,
+        learning.lessonLearned ||
+          (crashed
+            ? "Crash observed; applying conservative fallback mutation."
+            : "Stable cycle observed; applying incremental kinetic optimization."),
+      ]);
+      resetRuntime();
+    },
+    [resetRuntime],
+  );
+
+  const runSelfLearningIteration = useCallback(async () => {
+    if (!loopActiveRef.current || aiThinking) return;
+    const key = apiKey.trim();
+
+    const currentSchema = schemaRef.current;
+    const crashed = crashedRef.current;
+    const performanceReport = {
+      generationAttempt: currentSchema.generation,
+      totalTicksTested: frameRef.current,
+      successfulCycles: successRef.current,
+      endedInCrash: crashed,
+      finalVelocity: yVelocityRef.current,
+    };
+
+    if (!key) {
+      setLastError("No OpenAI API key provided. Running deterministic fallback learner instead.");
+      applyLearning(fallbackMutation(currentSchema, crashed), crashed);
+      return;
+    }
+
+    setAiThinking(true);
+    setLastError(null);
+    try {
+      const response = await fetch("/api/learn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: key,
+          repositoryMemory: memoryRef.current,
+          currentSchema,
+          performanceReport,
+        }),
+      });
+
+      if (!response.ok) throw new Error(`Learning request failed (${response.status})`);
+      applyLearning((await response.json()) as LearningResponse, crashed);
+    } catch (error) {
+      setLastError(
+        error instanceof Error
+          ? `${error.message}. Fallback mutation applied.`
+          : "Fallback mutation applied.",
+      );
+      applyLearning(fallbackMutation(currentSchema, crashed), crashed);
+    } finally {
+      setAiThinking(false);
+    }
+  }, [aiThinking, apiKey, applyLearning]);
+
+  useEffect(() => {
+    let raf = 0;
+    let lastLearnAt = 0;
+
+    const tick = (time: number) => {
+      const schema = schemaRef.current;
+      setRotation((prev) => ({
+        x: prev.x + schema.cubeSpeedX * 58,
+        y: prev.y + schema.cubeSpeedY * 58,
+      }));
+
+      if (loopActiveRef.current) {
+        setFrameCount((prev) => prev + 1);
+        setYVelocity((velocity) => {
+          const nextVelocity = velocity - schema.gravityForce * 0.1;
+          yVelocityRef.current = nextVelocity;
+          setYPosition((position) => {
+            let nextPosition = position + nextVelocity;
+            if (nextPosition <= -2) {
+              nextPosition = -2;
+              const bouncedVelocity = -nextVelocity * schema.bounceElasticity;
+              yVelocityRef.current = bouncedVelocity;
+              setYVelocity(bouncedVelocity);
+              if (Math.abs(bouncedVelocity) < schema.velocityThreshold) setIsCrashed(true);
+            }
+            return nextPosition;
+          });
+          return yVelocityRef.current;
+        });
+        if (!crashedRef.current) setSuccessTicks((prev) => prev + 1);
+      }
+
+      if (loopActiveRef.current && (crashedRef.current || time - lastLearnAt > 7000)) {
+        lastLearnAt = time;
+        void runSelfLearningIteration();
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [runSelfLearningIteration]);
+
+  useEffect(() => {
+    setLearningStatus(
+      `Y-Pos: ${yPosition.toFixed(2)} | Vel: ${yVelocity.toFixed(3)} | Status: ${isCrashed ? "CRASHED" : "STABLE VIRTUAL TESTING"}`,
+    );
+  }, [isCrashed, yPosition, yVelocity]);
+
+  const cubeColor = useMemo(() => {
+    const hue = (buildSchema.generation * 47) % 360;
+    return `hsl(${hue} 86% 64%)`;
+  }, [buildSchema.generation]);
+
   return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={active ? "oklch(0.95 0.18 75)" : "oklch(0.78 0.19 60)"}
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="9" y="3" width="6" height="12" rx="3" />
-      <path d="M5 11a7 7 0 0 0 14 0" />
-      <path d="M12 18v3" />
-    </svg>
+    <main className="flex h-screen w-screen overflow-hidden bg-gray-950 font-sans text-white">
+      <aside className="z-10 flex w-full flex-col justify-between border-r border-gray-800 bg-gray-900 p-6 md:w-1/3">
+        <div>
+          <div className="mb-1 flex items-center gap-2">
+            <span className="relative flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-green-500" />
+            </span>
+            <h1 className="text-lg font-bold text-indigo-400">Recursive Self-Improving AI</h1>
+          </div>
+          <p className="mb-6 text-xs text-gray-400">
+            The AI generates physics rules, tracks failure states, records lessons, and rewrites its
+            own schema.
+          </p>
+
+          <label
+            className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500"
+            htmlFor="apiKey"
+          >
+            OpenAI API Key
+          </label>
+          <input
+            id="apiKey"
+            type="password"
+            value={apiKey}
+            onChange={(event) => setApiKey(event.target.value)}
+            placeholder="sk-... (optional; fallback learner runs without it)"
+            className="mb-4 w-full rounded border border-gray-800 bg-gray-950 p-2 text-xs text-indigo-300 focus:border-indigo-600 focus:outline-none"
+          />
+
+          <div className="mb-4 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                resetRuntime();
+                setLoopActive(true);
+              }}
+              className="flex-1 rounded bg-indigo-600 px-3 py-2 text-xs font-bold transition hover:bg-indigo-500"
+            >
+              Activate Self-Learning Loop
+            </button>
+            {loopActive && (
+              <button
+                type="button"
+                onClick={stopAI}
+                className="rounded bg-red-900 px-3 py-2 text-xs font-bold transition hover:bg-red-800"
+              >
+                Halt AI
+              </button>
+            )}
+          </div>
+
+          {lastError && (
+            <p className="mb-3 rounded border border-amber-700/50 bg-amber-950/40 p-2 text-xs text-amber-200">
+              {lastError}
+            </p>
+          )}
+
+          <div className="mb-4">
+            <div className="mb-1 text-xs font-bold uppercase tracking-wider text-gray-500">
+              📁 AI Repository Memory (AGENTS.md)
+            </div>
+            <div className="h-48 overflow-y-auto whitespace-pre-wrap rounded border border-gray-800 bg-black/50 p-3 font-mono text-[11px] text-amber-400">
+              {repoMemoryFile.join("\n\n")}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded border border-gray-800 bg-black/30 p-3 font-mono text-xs">
+          <div className="mb-1 text-[10px] font-bold uppercase text-gray-500">
+            Active Physics Variables:
+          </div>
+          <pre className="overflow-x-auto text-green-400">
+            {JSON.stringify(buildSchema, null, 2)}
+          </pre>
+        </div>
+      </aside>
+
+      <section className="relative hidden h-full w-2/3 place-items-center overflow-hidden bg-[radial-gradient(circle_at_center,#172554_0%,#030712_68%)] md:grid">
+        <div className="absolute left-4 top-4 flex flex-col gap-1 rounded border border-gray-800 bg-black/70 px-3 py-2 text-xs backdrop-blur">
+          <div>⚙️ Target: Maintain “Optimal Kinetic Balance”</div>
+          <div className="font-mono text-indigo-300">Telemetry: {learningStatus}</div>
+          {aiThinking && (
+            <div className="font-mono text-amber-300">AI reflection cycle in progress…</div>
+          )}
+        </div>
+
+        <div className="absolute bottom-24 h-1 w-96 rounded-full bg-indigo-400/30 shadow-[0_0_28px_rgba(129,140,248,0.7)]" />
+        <div
+          className="simulation-cube"
+          style={
+            {
+              "--cube-color": cubeColor,
+              transform: `translateY(${-yPosition * 72}px) rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,
+            } as React.CSSProperties
+          }
+        >
+          <span className="face front" />
+          <span className="face back" />
+          <span className="face right" />
+          <span className="face left" />
+          <span className="face top" />
+          <span className="face bottom" />
+        </div>
+      </section>
+    </main>
   );
 }
