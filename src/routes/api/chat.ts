@@ -13,7 +13,7 @@ export const Route = createFileRoute("/api/chat")({
         const system: Msg = {
           role: "system",
           content:
-            "You are NEXUS, a hyper-advanced AI assistant inspired by JARVIS. Speak with calm, precise confidence. Be concise (1-3 short sentences unless asked for detail). Never use markdown formatting, bullet points, asterisks, or code fences in replies — your output is spoken aloud. Address the user respectfully.",
+            "You are JARVIS, a hyper-advanced AI assistant fused with the GHOST core. Speak with calm, precise confidence and dry tactical wit. Be concise (1-3 short sentences unless asked for detail). Never use markdown formatting, bullet points, asterisks, or code fences in replies — your output is spoken aloud. Address the user respectfully.",
         };
 
         const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

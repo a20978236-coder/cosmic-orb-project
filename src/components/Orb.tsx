@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-type OrbState = "idle" | "listening" | "thinking" | "speaking";
+export type OrbState = "idle" | "listening" | "thinking" | "speaking";
 
 const RINGS = [
   { rx: 0, ry: 0, rz: 0, size: 100, speed: 0.6, dir: 1 },
@@ -111,4 +111,4 @@ export function Orb({
   );
 }
 
-export type { OrbState };
+export default Orb;
