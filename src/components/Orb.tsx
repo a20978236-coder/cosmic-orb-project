@@ -111,4 +111,4 @@ export function Orb({
   );
 }
 
-export type { OrbState };
+export default Orb;
