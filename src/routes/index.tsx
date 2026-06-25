@@ -1,15 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { createParser } from "eventsource-parser";
-import { Orb, type OrbState } from "@/components/Orb";
+import type { OrbState } from "@/components/Orb";
+
+// Lazy-load the heavy 3D Orb so it doesn't bloat the initial bundle.
+const Orb = lazy(() => import("@/components/Orb"));
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "NEXUS — Advanced AI" },
-      { name: "description", content: "An advanced voice-first AI assistant." },
-      { property: "og:title", content: "NEXUS — Advanced AI" },
-      { property: "og:description", content: "An advanced voice-first AI assistant." },
+      { title: "JARVIS — Advanced AI" },
+      { name: "description", content: "JARVIS: voice-first AI assistant with the GHOST core." },
+      { property: "og:title", content: "JARVIS — Advanced AI" },
+      { property: "og:description", content: "JARVIS: voice-first AI assistant with the GHOST core." },
     ],
   }),
   component: Index,
@@ -289,7 +292,7 @@ function Index() {
           <div className="flex items-center gap-3">
             <div className="h-2 w-2 rounded-full bg-[var(--orb-amber)] shadow-[0_0_10px_var(--orb-amber)]" />
             <h1 className="font-mono text-sm tracking-[0.4em] text-[var(--orb-amber)]">
-              N E X U S
+              J A R V I S
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -302,14 +305,22 @@ function Index() {
 
         {/* Orb */}
         <section className="my-6 flex flex-1 items-center justify-center">
-          <Orb state={orbState} level={level} />
+          <Suspense
+            fallback={
+              <div className="flex h-64 w-64 items-center justify-center font-mono text-xs tracking-[0.4em] text-[var(--orb-amber)]/60">
+                BOOTING CORE…
+              </div>
+            }
+          >
+            <Orb state={orbState} level={level} />
+          </Suspense>
         </section>
 
         {/* Transcript */}
         <section className="mb-4 max-h-56 overflow-y-auto rounded-lg border border-border bg-card/40 p-4 backdrop-blur-sm">
           {messages.length === 0 && !streaming && (
             <p className="text-center font-mono text-xs tracking-widest text-muted-foreground">
-              SYSTEM ONLINE — SPEAK OR TYPE TO BEGIN
+              JARVIS ONLINE — SPEAK OR TYPE TO BEGIN
             </p>
           )}
           <ul className="space-y-3">
@@ -322,7 +333,7 @@ function Index() {
                       : "mr-2 font-mono text-xs tracking-widest text-[var(--orb-amber)]"
                   }
                 >
-                  {m.role === "user" ? "YOU »" : "NEXUS »"}
+                  {m.role === "user" ? "YOU »" : "JARVIS »"}
                 </span>
                 <span className="text-foreground/90">{m.content}</span>
               </li>
@@ -330,7 +341,7 @@ function Index() {
             {streaming && (
               <li className="text-sm">
                 <span className="mr-2 font-mono text-xs tracking-widest text-[var(--orb-amber)]">
-                  NEXUS »
+                  JARVIS »
                 </span>
                 <span className="text-foreground/90">{streaming}</span>
               </li>
@@ -361,7 +372,7 @@ function Index() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Address NEXUS…"
+              placeholder="Address JARVIS…"
               disabled={orbState !== "idle" && orbState !== "listening"}
               className="h-12 w-full rounded-full border border-border bg-card/60 px-5 font-mono text-sm tracking-wide text-foreground placeholder:text-muted-foreground/60 focus:border-[var(--orb-amber)] focus:outline-none disabled:opacity-50"
             />
