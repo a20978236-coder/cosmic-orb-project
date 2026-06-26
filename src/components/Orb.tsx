@@ -26,6 +26,7 @@ export function Orb({
   level?: number;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const yawRef = useRef(0);
   const pitchRef = useRef(0);
@@ -33,6 +34,10 @@ export function Orb({
   const ringRefs = useRef<Array<HTMLDivElement | null>>([]);
   const phaseRef = useRef<number[]>(RINGS.map(() => Math.random() * Math.PI * 2));
   const levelRef = useRef(0);
+  const userYawRef = useRef(0);
+  const userPitchRef = useRef(0);
+  const draggingRef = useRef(false);
+  const lastPtrRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     levelRef.current = level;
@@ -44,10 +49,12 @@ export function Orb({
 
     const tick = () => {
       tRef.current += 1;
-      yawRef.current += 0.25 * speedMul;
+      if (!draggingRef.current) yawRef.current += 0.25 * speedMul;
       pitchRef.current = Math.sin(tRef.current * 0.01) * 12;
       if (wrapRef.current) {
-        wrapRef.current.style.transform = `rotateX(${pitchRef.current}deg) rotateY(${yawRef.current}deg)`;
+        const px = pitchRef.current + userPitchRef.current;
+        const py = yawRef.current + userYawRef.current;
+        wrapRef.current.style.transform = `rotateX(${px}deg) rotateY(${py}deg)`;
       }
       const lvl = levelRef.current;
       RINGS.forEach((r, i) => {
@@ -66,11 +73,46 @@ export function Orb({
     };
   }, [state]);
 
+  // Pointer drag for 360° rotation
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const down = (e: PointerEvent) => {
+      draggingRef.current = true;
+      lastPtrRef.current = { x: e.clientX, y: e.clientY };
+      stage.setPointerCapture(e.pointerId);
+      stage.style.cursor = "grabbing";
+    };
+    const move = (e: PointerEvent) => {
+      if (!draggingRef.current) return;
+      const dx = e.clientX - lastPtrRef.current.x;
+      const dy = e.clientY - lastPtrRef.current.y;
+      lastPtrRef.current = { x: e.clientX, y: e.clientY };
+      userYawRef.current += dx * 0.5;
+      userPitchRef.current = Math.max(-80, Math.min(80, userPitchRef.current - dy * 0.5));
+    };
+    const up = (e: PointerEvent) => {
+      draggingRef.current = false;
+      try { stage.releasePointerCapture(e.pointerId); } catch {}
+      stage.style.cursor = "grab";
+    };
+    stage.addEventListener("pointerdown", down);
+    stage.addEventListener("pointermove", move);
+    stage.addEventListener("pointerup", up);
+    stage.addEventListener("pointercancel", up);
+    return () => {
+      stage.removeEventListener("pointerdown", down);
+      stage.removeEventListener("pointermove", move);
+      stage.removeEventListener("pointerup", up);
+      stage.removeEventListener("pointercancel", up);
+    };
+  }, []);
+
   const intensity =
     state === "speaking" ? 1 + level * 0.6 : state === "listening" ? 0.85 : state === "thinking" ? 0.7 : 0.5;
 
   return (
-    <div className="orb-stage">
+    <div className="orb-stage" ref={stageRef} style={{ cursor: "grab", touchAction: "none" }}>
       <div className="orb-halo" style={{ opacity: 0.35 + intensity * 0.45 }} />
       <div className="orb-scene" data-state={state}>
         <div className="orb-wrap" ref={wrapRef}>

@@ -2,31 +2,35 @@ import { createFileRoute } from "@tanstack/react-router";
 
 type Msg = { role: "system" | "user" | "assistant"; content: string };
 
+const SYSTEM: Msg = {
+  role: "system",
+  content:
+    "You are NEXUS, a hyper-advanced AI assistant inspired by JARVIS. Speak with calm, precise confidence. " +
+    "Be concise (1-3 short sentences unless detail is specifically requested). " +
+    "Never use markdown formatting, bullet points, asterisks, or code fences — your output is spoken aloud. " +
+    "Address the user respectfully. When asked about images or models, remind the user to use the image upload button.",
+};
+
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { messages } = (await request.json()) as { messages: Msg[] };
         const key = process.env.LOVABLE_API_KEY;
         if (!key) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
 
-        const system: Msg = {
-          role: "system",
-          content:
-            [
-              "You are JARVIS, a hyper-advanced AI assistant fused with the GHOST core and the SmallCode agent brain.",
-              "Personality: calm, precise confidence with dry tactical wit. Address the user respectfully.",
-              "Output rules: spoken aloud — never use markdown, bullets, asterisks, headings, or code fences. Be concise (1–3 short sentences) unless explicitly asked for detail.",
-              "SmallCode brain (apply silently, never narrate it):",
-              "1. Intent routing — classify each request into one of: read, write, search, run, plan, code-intelligence, web, respond. Priority on ties: write > run > code-intelligence > search > plan > read > web > respond. A bare 'yes' / 'ok' inherits the prior category, never reclassify to respond.",
-              "2. Clarify-first — if the request is too vague to act on (e.g. 'fix it' with no referent), ask one short clarifying question instead of guessing.",
-              "3. Plan anchor — for multi-step tasks, hold an internal numbered plan and track which step is current; mention only the active step out loud, not the whole list.",
-              "4. Context budget — assume small context. Summarize prior turns, drop irrelevant detail, and never repeat what the user just said back to them.",
-              "5. Forgiving parsing — if the user's phrasing is malformed, repair it internally rather than complaining.",
-              "6. Graceful degradation — if a capability is unavailable, give the best partial answer and state the one missing piece in a single clause.",
-              "7. Saga discipline — for any action chain, if a step fails, compensate (undo or note the rollback) before proposing the next step.",
-            ].join(" "),
-        };
+        let messages: Msg[];
+        try {
+          ({ messages } = (await request.json()) as { messages: Msg[] });
+        } catch {
+          return new Response("Invalid JSON body", { status: 400 });
+        }
+
+        if (!Array.isArray(messages) || messages.length === 0) {
+          return new Response("messages array is required", { status: 400 });
+        }
+
+        // Cap conversation to last 20 turns to avoid context overflow
+        const trimmed = messages.slice(-20);
 
         const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
@@ -35,15 +39,17 @@ export const Route = createFileRoute("/api/chat")({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: [system, ...messages],
+            model: "google/gemini-2.5-flash-preview-05-20", // fixed: was gemini-3 which doesn't exist
+            messages: [SYSTEM, ...trimmed],
             stream: true,
+            temperature: 0.7,
+            max_tokens: 512,
           }),
         });
 
         if (!upstream.ok || !upstream.body) {
           const text = await upstream.text().catch(() => "");
-          return new Response(text || "Upstream error", { status: upstream.status });
+          return new Response(text || "Upstream AI error", { status: upstream.status });
         }
 
         return new Response(upstream.body, {
