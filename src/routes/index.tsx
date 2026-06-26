@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { createParser } from "eventsource-parser";
 import { Orb, type OrbState } from "@/components/Orb";
+
+const GhostVisionSandbox = lazy(() => import("@/components/GhostVisionSandbox"));
+
+const GHOST_TRIGGER = /\bghost\s+vision\s+activate\b/i;
 
 export const Route = createFileRoute("/")(({
   head: () => ({
@@ -74,6 +78,7 @@ function Index() {
   const [images,    setImages]    = useState<AttachedImage[]>([]);
   const [dragOver,  setDragOver]  = useState(false);
   const [visionMode, setVisionMode] = useState(false); // true while awaiting vision response
+  const [sandboxOpen, setSandboxOpen] = useState(false);
 
   const recRef       = useRef<MediaRecorder | null>(null);
   const chunksRef    = useRef<Blob[]>([]);
@@ -199,6 +204,19 @@ function Index() {
 
     // Need at least text or images
     if (!clean && !hasImages) return;
+
+    // ── Ghost Vision wake phrase ─────────────────────────────────────────
+    if (clean && GHOST_TRIGGER.test(clean)) {
+      setMessages((m) => [
+        ...m,
+        { role: "user", content: clean },
+        { role: "assistant", content: "Ghost Vision activated. Entering live 3D simulation." },
+      ]);
+      setInput("");
+      setSandboxOpen(true);
+      setOrbState("idle");
+      return;
+    }
 
     setError(null);
     setStreaming("");
@@ -612,6 +630,12 @@ function Index() {
           Drag images anywhere · paste from clipboard · click 📷 to browse · max {MAX_IMAGES} images / {MAX_MB} MB each
         </p>
       </div>
+
+      {sandboxOpen && (
+        <Suspense fallback={null}>
+          <GhostVisionSandbox onClose={() => setSandboxOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }
