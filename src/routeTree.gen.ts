@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as GhostVisionRouteImport } from './routes/ghost-vision'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiVisionRouteImport } from './routes/api/vision'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
@@ -16,6 +17,11 @@ import { Route as ApiSttRouteImport } from './routes/api/stt'
 import { Route as ApiSimulateRouteImport } from './routes/api/simulate'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 
+const GhostVisionRoute = GhostVisionRouteImport.update({
+  id: '/ghost-vision',
+  path: '/ghost-vision',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -49,6 +55,7 @@ const ApiChatRoute = ApiChatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ghost-vision': typeof GhostVisionRoute
   '/api/chat': typeof ApiChatRoute
   '/api/simulate': typeof ApiSimulateRoute
   '/api/stt': typeof ApiSttRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ghost-vision': typeof GhostVisionRoute
   '/api/chat': typeof ApiChatRoute
   '/api/simulate': typeof ApiSimulateRoute
   '/api/stt': typeof ApiSttRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ghost-vision': typeof GhostVisionRoute
   '/api/chat': typeof ApiChatRoute
   '/api/simulate': typeof ApiSimulateRoute
   '/api/stt': typeof ApiSttRoute
@@ -76,6 +85,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ghost-vision'
     | '/api/chat'
     | '/api/simulate'
     | '/api/stt'
@@ -84,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ghost-vision'
     | '/api/chat'
     | '/api/simulate'
     | '/api/stt'
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/ghost-vision'
     | '/api/chat'
     | '/api/simulate'
     | '/api/stt'
@@ -101,6 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  GhostVisionRoute: typeof GhostVisionRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiSimulateRoute: typeof ApiSimulateRoute
   ApiSttRoute: typeof ApiSttRoute
@@ -110,6 +123,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/ghost-vision': {
+      id: '/ghost-vision'
+      path: '/ghost-vision'
+      fullPath: '/ghost-vision'
+      preLoaderRoute: typeof GhostVisionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -157,6 +177,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  GhostVisionRoute: GhostVisionRoute,
   ApiChatRoute: ApiChatRoute,
   ApiSimulateRoute: ApiSimulateRoute,
   ApiSttRoute: ApiSttRoute,
