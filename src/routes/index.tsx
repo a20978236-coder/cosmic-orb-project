@@ -1,8 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createParser } from "eventsource-parser";
 import { Orb, type OrbState } from "@/components/Orb";
-import { BuildSimulator } from "@/components/ghost/BuildSimulator";
 
 export const Route = createFileRoute("/")(({
   head: () => ({ meta: [
@@ -23,7 +22,6 @@ function GhostIndex(){
   const [streaming, setStreaming] = useState("");
   const [error,     setError]     = useState<string|null>(null);
   const [rotating,  setRotating]  = useState(false);   // 360° showcase toggle
-  const [visionOn,  setVisionOn]  = useState(false);   // Ghost Vision panel toggle
 
   const recRef     = useRef<MediaRecorder|null>(null);
   const chunksRef  = useRef<Blob[]>([]);
@@ -153,9 +151,8 @@ function GhostIndex(){
   const label=orbState==="rotating"?"360° SHOWCASE":orbState==="vision"?"GHOST VISION":orbState==="speaking"?"RESPONDING":orbState==="thinking"?"PROCESSING":orbState==="listening"?"LISTENING":"STANDBY";
 
   return(
-    <div className="min-h-screen w-full hud-grid flex flex-col lg:flex-row">
-      {/* ── MAIN ──────────────────────────────────────────────────── */}
-      <div className={`flex flex-col px-4 py-5 md:px-8 transition-all duration-300 ${visionOn?"lg:w-[52%]":"w-full"}`}>
+    <div className="min-h-screen w-full hud-grid flex flex-col">
+      <div className="flex flex-col px-4 py-5 md:px-8 w-full">
         <div className="mx-auto w-full max-w-3xl flex flex-col flex-1">
 
           {/* top bar */}
@@ -178,16 +175,16 @@ function GhostIndex(){
               </button>
 
               {/* ghost vision toggle */}
-              <button onClick={()=>setVisionOn(v=>!v)}
-                className={`hud-chip cursor-pointer hover:opacity-80 transition-all select-none ${visionOn?"shadow-[0_0_14px_var(--orb-amber)]":""}`}
+              <Link to="/ghost-vision"
+                className="hud-chip cursor-pointer hover:opacity-80 transition-all select-none"
                 title="Open Ghost Vision 3D Build Simulator">
-                👁 {visionOn?"VISION ON":"GHOST VISION"}
-              </button>
+                👁 GHOST VISION
+              </Link>
             </div>
           </header>
 
           {/* orb */}
-          <section className={`flex items-center justify-center ${visionOn?"my-3":"my-6 flex-1"}`}>
+          <section className="flex items-center justify-center my-6 flex-1">
             <Orb state={orbState} level={level}/>
           </section>
 
@@ -239,27 +236,6 @@ function GhostIndex(){
           {error&&<p className="mt-3 text-center font-mono text-xs tracking-wider text-destructive">{error}</p>}
         </div>
       </div>
-
-      {/* ── GHOST VISION PANEL ─────────────────────────────────────── */}
-      {visionOn&&(
-        <aside className="lg:w-[48%] w-full border-t lg:border-t-0 lg:border-l border-[var(--orb-amber)]/20 bg-[oklch(0.09_0.04_254_/_0.55)] backdrop-blur-md flex flex-col min-h-[60vh] lg:min-h-screen">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--orb-amber)]/20">
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full bg-[var(--orb-amber)] animate-pulse"/>
-              <span className="font-mono text-xs tracking-[0.3em] text-[var(--orb-amber)]">GHOST VISION</span>
-            </div>
-            <button onClick={()=>setVisionOn(false)}
-              className="text-muted-foreground hover:text-foreground font-mono text-xs cursor-pointer">✕ CLOSE</button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            <BuildSimulator onStateChange={s=>{
-              if(s==="vision")     setOrbState("vision");
-              else if(s==="thinking") setOrbState("thinking");
-              else setOrbState(idleState());
-            }}/>
-          </div>
-        </aside>
-      )}
     </div>
   );
 }
