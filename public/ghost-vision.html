@@ -53,6 +53,19 @@
                     <span class="inline-block w-2 h-2 rounded-full bg-white animate-pulse"></span>
                     INITIATE VISION PROTOCOL
                 </button>
+                <label class="mt-3 flex items-center justify-center gap-2 cursor-pointer border border-dashed border-cyan-700/60 hover:border-cyan-400 rounded-lg px-3 py-3 text-[11px] font-bold tracking-wider uppercase text-cyan-300 transition">
+                    <span>⚡</span><span id="mainframeUploadLabel">Ingest Blueprint → Auto-Build in Viewport</span>
+                    <input id="mainframeFileInput" type="file" accept="image/*" style="display:none">
+                </label>
+                <div id="mainframeProgressWrap" class="hidden mt-3 space-y-1">
+                    <div class="flex items-center justify-between text-[9px] font-mono uppercase tracking-wider">
+                        <span id="mainframeProgressLabel" class="text-cyan-400">Idle</span>
+                        <span id="mainframeProgressPct" class="text-cyan-300">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-950 border border-cyan-900/40 rounded-full h-1.5 overflow-hidden">
+                        <div id="mainframeProgressBar" class="bg-gradient-to-r from-cyan-400 to-indigo-500 h-full rounded-full transition-all duration-300" style="width:0%"></div>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="hologram border border-cyan-900/30 rounded p-3 font-mono text-xs mt-3 relative z-10">
