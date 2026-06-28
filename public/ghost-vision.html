@@ -122,13 +122,58 @@
         }
         document.getElementById('runMainframeBtn').addEventListener('click', compile);
         bar.addEventListener('keypress', e => { if (e.key === 'Enter') compile(); });
+        let visionWin = null;
         function launch() {
+            if (visionWin && !visionWin.closed) { visionWin.focus(); return visionWin; }
             const w = window.open('', '_blank', 'width=1200,height=800');
-            if (!w) { mem.textContent += `[ERROR] Quantum link blocked. Enable popup protocols.\n`; mem.scrollTop = mem.scrollHeight; return; }
+            if (!w) { mem.textContent += `[ERROR] Quantum link blocked. Enable popup protocols.\n`; mem.scrollTop = mem.scrollHeight; return null; }
             w.document.write(visionHTML()); w.document.close();
+            visionWin = w;
             mem.textContent += `[SUCCESS] Vision protocol deployed to quantum layer.\n`; mem.scrollTop = mem.scrollHeight;
+            return w;
         }
         document.getElementById('launchVisionBtn').addEventListener('click', launch);
+
+        // ── Mainframe image upload → drives simulateBuild/buildObjectFromData in viewport ──
+        const fInput = document.getElementById('mainframeFileInput');
+        const fLabel = document.getElementById('mainframeUploadLabel');
+        const pWrap = document.getElementById('mainframeProgressWrap');
+        const pBar = document.getElementById('mainframeProgressBar');
+        const pPct = document.getElementById('mainframeProgressPct');
+        const pLab = document.getElementById('mainframeProgressLabel');
+        function setProg(pct, label) {
+            pWrap.classList.remove('hidden');
+            pBar.style.width = pct + '%';
+            pPct.textContent = pct + '%';
+            pLab.textContent = label;
+            mem.textContent += `[PROGRESS ${pct}%] ${label}\n`; mem.scrollTop = mem.scrollHeight;
+        }
+        function waitReady(w, cb, tries=0) {
+            if (tries > 80) { setProg(100, 'TIMEOUT — viewport unresponsive'); return; }
+            if (w && !w.closed && w.__ghostReady) cb();
+            else setTimeout(() => waitReady(w, cb, tries+1), 100);
+        }
+        window.addEventListener('message', e => {
+            const d = e.data || {};
+            if (d.type === 'ghost:stage') setProg(d.pct, d.label);
+        });
+        fInput.addEventListener('change', e => {
+            const file = e.target.files[0]; if (!file) return;
+            fLabel.textContent = '✅ ' + file.name;
+            setProg(10, 'INGESTING BLUEPRINT…');
+            const rd = new FileReader();
+            rd.onload = ev => {
+                setProg(30, 'OPENING QUANTUM VIEWPORT…');
+                const w = launch(); if (!w) { setProg(100, 'BLOCKED — allow popups'); return; }
+                setProg(45, 'AWAITING VIEWPORT HANDSHAKE…');
+                waitReady(w, () => {
+                    setProg(60, 'TRANSMITTING NEURAL DATA…');
+                    w.postMessage({ type: 'ghost:build', dataUrl: ev.target.result, name: file.name }, '*');
+                });
+            };
+            rd.readAsDataURL(file);
+            e.target.value = '';
+        });
 
         function visionHTML() {
             return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>GHOST // Vision Quantum Layer</title>
