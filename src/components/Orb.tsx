@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 export type OrbState = "idle"|"listening"|"thinking"|"speaking"|"rotating"|"vision";
 
 const RINGS = [
@@ -20,7 +20,7 @@ const SPEED: Record<OrbState,number> = {
   idle:0.9, listening:1.3, thinking:2.0, speaking:3.2, rotating:5.0, vision:2.5,
 };
 
-export function Orb({ state, level=0 }: { state:OrbState; level?:number }) {
+function OrbComponent({ state, level=0 }: { state:OrbState; level?:number }) {
   const wrapRef  = useRef<HTMLDivElement>(null);
   const rafRef   = useRef<number|null>(null);
   const yawRef   = useRef(0);
@@ -95,3 +95,5 @@ export function Orb({ state, level=0 }: { state:OrbState; level?:number }) {
     </div>
   );
 }
+
+export const Orb = React.memo(OrbComponent, (prev, next) => prev.state === next.state && prev.level === next.level);
