@@ -7,21 +7,22 @@ export const Route = createFileRoute("/api/chat")({
     handlers: {
       POST: async ({ request }) => {
         const body = await request.json();
+        const key = process.env.LOVABLE_API_KEY;
+        if (!key) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
+
         // This line makes it work with both complex arrays and simple text from Siri
         const incomingMessages = body.messages || [{ role: "user", content: body.text }];
         
-        const key = "sk-emergent-131836d90AdD210D89";
-
         const system: Msg = {
           role: "system",
           content:
             "You are NEXUS, Alan's high-speed JARVIS. You manage his streetwear business. " +
             "Alan sells custom 'Anti-Design' graphics for $10 via Instagram DMs. " +
             "Knowledge: Alan is a student in Florida. Universal trip July 10-12. " +
-            "Personality: Calm, sophisticated, focused. Address him as Alan. Be concise (1-3 short sentences). No markdown.",
+            "Personality: Calm, sophisticated, focused. Address him as Alan. Be concise (1-3 short sentences). No markdown. Output is spoken aloud.",
         };
 
-        const upstream = await fetch("https://integrations.emergentagent.com/llm/v1/chat/completions", {
+        const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${key}`,
