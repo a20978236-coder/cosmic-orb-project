@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createParser } from "eventsource-parser";
 import { Orb, type OrbState } from "@/components/Orb";
 
-export const Route = createFileRoute("/")(({
+export const Route = createFileRoute("/")(({ 
   head: () => ({ meta: [
     { title: "GHOST — Autonomous Intelligence" },
     { name: "description", content: "G.H.O.S.T autonomous AI with 3D build simulation." },
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")(({
   component: GhostIndex,
 }));
 
-type Msg = { role:"user"|"assistant"; content:string };
+type Msg = { id: string; role:"user"|"assistant"; content:string };
 
 function GhostIndex(){
   const [messages,  setMessages]  = useState<Msg[]>([]);
@@ -30,8 +30,16 @@ function GhostIndex(){
   const analyserRef = useRef<AnalyserNode|null>(null);
   const gainRef     = useRef<GainNode|null>(null);
   const txRef       = useRef<HTMLUListElement>(null);
-+  // decoupled amplitude sampling: sample at RAF into this ref, update React state at a lower rate
-+  const levelSampleRef = useRef(0);
+  // decoupled amplitude sampling: sample at RAF into this ref, update React state at a lower rate
+  const levelSampleRef = useRef(0);
+  // worker for TTS chunk decoding
+  const ttsWorkerRef = useRef<Worker|null>(null);
+  // pending byte for odd-length chunk handling
+  const pendingRef = useRef<Uint8Array | null>(null);
+  // last scroll timestamp
+  const lastScrollRef = useRef(0);
+  // metrics interval id
+  const metricsIntervalRef = useRef<number | null>(null);
 
   // derive orb state: vision/thinking/speaking take priority; else idle or rotating
   const idleState = (): OrbState => rotating ? "rotating" : "idle";
@@ -50,40 +58,32 @@ function GhostIndex(){
 
   // amplitude poll - sample at RAF but only update React state at a lower rate (throttle)
   useEffect(()=>{
--    let raf=0; const buf=new Uint8Array(256);
--    const loop=()=>{
--      const an=analyserRef.current;
--      if(an){an.getByteTimeDomainData(buf);let sum=0;for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;sum+=v*v;}setLevel(p=>p*.6+Math.min(1,Math.sqrt(sum/buf.length)*3)*.4);}
--      else setLevel(p=>p*.85);
--      raf=requestAnimationFrame(loop);
--    };
--    raf=requestAnimationFrame(loop); return()=>cancelAnimationFrame(raf);
-+    let raf=0; const buf=new Uint8Array(256);
-+    const loop=()=>{
-+      const an=analyserRef.current;
-+      if(an){
-+        an.getByteTimeDomainData(buf);
-+        let sum=0; for(let i=0;i<buf.length;i++){ const v=(buf[i]-128)/128; sum+=v*v; }
-+        const sampled = Math.min(1, Math.sqrt(sum/buf.length)*3);
-+        // store sampled level into a ref (no React state update here)
-+        levelSampleRef.current = sampled;
-+      } else {
-+        // decay the sampled value when no analyser is available
-+        levelSampleRef.current = levelSampleRef.current * 0.85;
-+      }
-+      raf=requestAnimationFrame(loop);
-+    };
-+    raf=requestAnimationFrame(loop);
-+    return()=>cancelAnimationFrame(raf);
+    let raf=0; const buf=new Uint8Array(256);
+    const loop=()=>{
+      const an=analyserRef.current;
+      if(an){
+        an.getByteTimeDomainData(buf);
+        let sum=0; for(let i=0;i<buf.length;i++){ const v=(buf[i]-128)/128; sum+=v*v; }
+        const sampled = Math.min(1, Math.sqrt(sum/buf.length)*3);
+        // store sampled level into a ref (no React state update here)
+        levelSampleRef.current = sampled;
+      } else {
+        // decay the sampled value when no analyser is available
+        levelSampleRef.current = levelSampleRef.current * 0.85;
+      }
+      raf=requestAnimationFrame(loop);
+    };
+    raf=requestAnimationFrame(loop);
+    return()=>cancelAnimationFrame(raf);
   },[]);
-+
-+  // throttle React state updates for `level` to ~10Hz to avoid re-rendering every frame
-+  useEffect(()=>{
-+    const id = setInterval(()=>{
-+      setLevel(prev=> prev*0.6 + Math.min(1, levelSampleRef.current) * 0.4);
-+    }, 100);
-+    return ()=>clearInterval(id);
-+  },[]);
+
+  // throttle React state updates for `level` to ~10Hz to avoid re-rendering every frame
+  useEffect(()=>{
+    const id = window.setInterval(()=>{
+      setLevel(prev=> prev*0.6 + Math.min(1, levelSampleRef.current) * 0.4);
+    }, 100);
+    return ()=>clearInterval(id);
+  },[]);
 
   // sync rotation state
   useEffect(()=>{
@@ -91,41 +91,115 @@ function GhostIndex(){
     else if(!rotating&&orbState==="rotating") setOrbState("idle");
   },[rotating,orbState]);
 
-  // auto-scroll transcript
-  useEffect(()=>{ txRef.current?.scrollTo({top:txRef.current.scrollHeight,behavior:"smooth"}); },[messages,streaming]);
+  // auto-scroll transcript: immediate when updates are frequent, smooth otherwise
+  useEffect(()=>{
+    const el = txRef.current;
+    if(!el) return;
+    const now = Date.now();
+    const behavior = (now - (lastScrollRef.current||0)) < 300 ? 'auto' : 'smooth';
+    lastScrollRef.current = now;
+    el.scrollTo({top: el.scrollHeight, behavior: behavior as ScrollBehavior});
+  },[messages,streaming]);
+
+  useEffect(()=>{
+    // setup metrics interval but pause when hidden
+    const tick = ()=>setMetrics({cpu:18+Math.round(Math.random()*65),mem:32+Math.round(Math.random()*50),ping:7+Math.round(Math.random()*24)});
+    const start = ()=>{ if(metricsIntervalRef.current==null) metricsIntervalRef.current = window.setInterval(tick,1500); };
+    const stop = ()=>{ if(metricsIntervalRef.current!=null){ clearInterval(metricsIntervalRef.current); metricsIntervalRef.current=null; } };
+    const onVis = ()=>{ if(typeof document!=='undefined' && document.hidden) stop(); else start(); };
+    start(); document.addEventListener('visibilitychange', onVis);
+    return ()=>{ stop(); document.removeEventListener('visibilitychange', onVis); };
+  },[]);
+
+  // ensure worker is cleaned up on unmount
+  useEffect(()=>{
+    return ()=>{
+      if(ttsWorkerRef.current){ ttsWorkerRef.current.terminate(); ttsWorkerRef.current = null; }
+    };
+  },[]);
 
   const speak = useCallback(async(text:string)=>{
     const ctx=await ensureAudio(); const gain=gainRef.current!;
     setOrbState("speaking");
     const res=await fetch("/api/tts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
     if(!res.ok||!res.body){setOrbState(idleState());return;}
-    let ph=0,pending=new Uint8Array(0),last=0;
-    const play=(inc:Uint8Array)=>{
-      const b=new Uint8Array(pending.length+inc.length);b.set(pending);b.set(inc,pending.length);
-      const u=b.length-(b.length%2);pending=b.slice(u);if(!u)return;
-      const s=new Int16Array(b.buffer,0,u/2);const f=Float32Array.from(s,x=>x/32768);
-      const buf=ctx.createBuffer(1,f.length,24000);buf.copyToChannel(f,0);
-      const src=ctx.createBufferSource();src.buffer=buf;src.connect(gain);
-      if(ph===0)ph=ctx.currentTime+.08;else ph=Math.max(ph,ctx.currentTime);
-      src.start(ph);ph+=buf.duration;last=ph;
+
+    // schedule playback per chunk (avoid large concatenation)
+    let ph=0; let last=0;
+
+    const playChunk = (bytes:Uint8Array)=>{
+      // handle odd pending byte
+      if(pendingRef.current && pendingRef.current.length){
+        const combined = new Uint8Array(pendingRef.current.length + bytes.length);
+        combined.set(pendingRef.current,0); combined.set(bytes,pendingRef.current.length);
+        bytes = combined; pendingRef.current = null;
+      }
+      // if odd length, keep last byte for next chunk
+      if(bytes.length % 2 !== 0){ pendingRef.current = bytes.slice(bytes.length-1); bytes = bytes.slice(0, bytes.length-1); }
+      if(bytes.length===0) return;
+      const s = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength/2);
+      const f = new Float32Array(s.length);
+      for(let i=0;i<s.length;i++) f[i] = s[i]/32768;
+      const buf = ctx.createBuffer(1, f.length, 24000); buf.copyToChannel(f,0);
+      const src = ctx.createBufferSource(); src.buffer = buf; src.connect(gain);
+      if(ph===0) ph = ctx.currentTime + 0.08; else ph = Math.max(ph, ctx.currentTime);
+      src.start(ph); ph += buf.duration; last = ph;
     };
-    const parser=createParser({onEvent(ev){
-      let p:{type:string;audio?:string};try{p=JSON.parse(ev.data);}catch{return;}
-      if(p.type!=="speech.audio.delta"||!p.audio)return;
-      const bin=atob(p.audio);const bytes=new Uint8Array(bin.length);
-      for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);play(bytes);
+
+    // ensure worker exists
+    if(!ttsWorkerRef.current){
+      try{
+        ttsWorkerRef.current = new Worker(new URL('../workers/ttsDecoder.worker.ts', import.meta.url), { type: 'module' });
+      }catch(e){
+        // worker not available; fallback to atob on main thread
+        ttsWorkerRef.current = null;
+      }
+    }
+
+    const parser = createParser({onEvent(ev){
+      if(ev.data==="[DONE]") return;
+      try{
+        const j = JSON.parse(ev.data);
+        const p = j.choices?.[0]?.delta || {};
+        const audioBase64 = p.audio;
+        if(!audioBase64) {
+          // streaming text
+          const d = j.choices?.[0]?.delta?.content ?? "";
+          if(d){ setStreaming(s => s + d); }
+          return;
+        }
+        // If we have a worker, use it to decode base64 -> ArrayBuffer
+        if(ttsWorkerRef.current){
+          const worker = ttsWorkerRef.current;
+          const onMessage = (ev2: MessageEvent) => {
+            const ab = ev2.data as ArrayBuffer;
+            playChunk(new Uint8Array(ab));
+          };
+          worker.addEventListener('message', onMessage, { once: true });
+          worker.postMessage(audioBase64);
+        }else{
+          // fallback on main thread (existing behavior)
+          const bin = atob(audioBase64);
+          const bytes = new Uint8Array(bin.length);
+          for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+          playChunk(bytes);
+        }
+      }catch(err){/* ignore parse errors */}
     }});
-    const reader=res.body.pipeThrough(new TextDecoderStream()).getReader();
-    try{while(true){const{value,done}=await reader.read();if(done)break;parser.feed(value);}}
-    finally{reader.cancel().catch(()=>{});}
-    window.setTimeout(()=>setOrbState(idleState()),Math.max(0,(last-ctx.currentTime)*1000+200));
+
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    try{ while(true){ const { value, done } = await reader.read(); if(done) break; parser.feed(value); } }
+    finally{ reader.cancel().catch(()=>{}); }
+
+    window.setTimeout(()=>setOrbState(idleState()), Math.max(0, (last - ctx.currentTime)*1000 + 200));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[ensureAudio,rotating]);
 
   const send = useCallback(async(text:string)=>{
     const clean=text.trim();if(!clean)return;
     setError(null);setStreaming("");
-    const next:Msg[]=[...messages,{role:"user",content:clean}];
+    const id = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
+    const next:Msg[]=[...messages,{id,role:"user",content:clean}];
     setMessages(next);setInput("");setOrbState("thinking");
     let full="";
     try{
@@ -136,9 +210,10 @@ function GhostIndex(){
         try{const j=JSON.parse(ev.data);const d=j.choices?.[0]?.delta?.content??"";if(d){full+=d;setStreaming(full);}}catch{}
       }});
       const reader=res.body.pipeThrough(new TextDecoderStream()).getReader();
-      while(true){const{value,done}=await reader.read();if(done)break;parser.feed(value);}
+      while(true){const{value,done}=await reader.read();if(done)break;parser.feed(value);}    
     }catch(e){setError(e instanceof Error?e.message:"Request failed");setOrbState(idleState());return;}
-    setMessages(m=>[...m,{role:"assistant",content:full}]);setStreaming("");
+    const aid = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
+    setMessages(m=>[...m,{id:aid,role:"assistant",content:full}]);setStreaming("");
     if(full.trim())await speak(full);else setOrbState(idleState());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[messages,speak,rotating]);
@@ -169,13 +244,9 @@ function GhostIndex(){
   const stopRecording=useCallback(()=>{recRef.current?.stop();recRef.current=null;setRecording(false);},[]);
 
   const [metrics,setMetrics]=useState({cpu:28,mem:44,ping:11});
-  useEffect(()=>{
-    const id=setInterval(()=>setMetrics({cpu:18+Math.round(Math.random()*65),mem:32+Math.round(Math.random()*50),ping:7+Math.round(Math.random()*24)}),1500);
-    return()=>clearInterval(id);
-  },[]);
 
   const isBusy=orbState==="thinking"||orbState==="speaking";
-  const label=orbState==="rotating"?"360° SHOWCASE":orbState==="vision"?"GHOST VISION":orbState==="speaking"?"RESPONDING":orbState==="thinking"?"PROCESSING":orbState==="listening"?"LISTENING":"S[...]"
+  const label=orbState==="rotating"?"360° SHOWCASE":orbState==="vision"?"GHOST VISION":orbState==="speaking"?"RESPONDING":orbState==="thinking"?"PROCESSING":orbState==="listening"?"LISTENING":"S[...]";
 
   return(
     <div className="min-h-screen w-full hud-grid flex flex-col">
@@ -223,8 +294,8 @@ function GhostIndex(){
               </p>
             )}
             <ul ref={txRef} className="space-y-3">
-              {messages.map((m,i)=>(
-                <li key={i} className="text-sm">
+              {messages.map((m)=> (
+                <li key={m.id} className="text-sm">
                   <span className={m.role==="user"?"mr-2 font-mono text-xs tracking-widest text-muted-foreground":"mr-2 font-mono text-xs tracking-widest text-[var(--orb-amber)]"}>
                     {m.role==="user"?"YOU »":"GHOST »"}
                   </span>
@@ -252,10 +323,10 @@ function GhostIndex(){
             <form className="flex flex-1 gap-2" onSubmit={e=>{e.preventDefault();void send(input);}}>
               <input value={input} onChange={e=>setInput(e.target.value)}
                 placeholder="Address GHOST…" disabled={isBusy}
-                className="h-12 flex-1 rounded-full border border-border bg-card/60 px-5 font-mono text-sm tracking-wide text-foreground placeholder:text-muted-foreground/60 focus:border-[var(--o[...]"/>
+                className="h-12 flex-1 rounded-full border border-border bg-card/60 px-5 font-mono text-sm tracking-wide text-foreground placeholder:text-muted-foreground/60 focus:border-[var(--o...]"/>
               <button type="submit" disabled={!input.trim()||isBusy}
-                className="h-12 rounded-full border border-[var(--orb-amber)]/60 bg-[var(--orb-orange)]/20 px-5 font-mono text-xs tracking-widest text-[var(--orb-amber)] hover:bg-[var(--orb-orang[...]"
-                SEND
+                className="h-12 rounded-full border border-[var(--orb-amber)]/60 bg-[var(--orb-orange)]/20 px-5 font-mono text-xs tracking-widest text-[var(--orb-amber)] hover:bg-[var(--orb-orang...]"
+                >SEND
               </button>
             </form>
           </footer>
@@ -277,3 +348,5 @@ function MicIcon({active}:{active:boolean}){
     </svg>
   );
 }
+
+export default GhostIndex;
