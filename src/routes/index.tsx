@@ -30,6 +30,8 @@ function GhostIndex(){
   const analyserRef = useRef<AnalyserNode|null>(null);
   const gainRef     = useRef<GainNode|null>(null);
   const txRef       = useRef<HTMLUListElement>(null);
++  // decoupled amplitude sampling: sample at RAF into this ref, update React state at a lower rate
++  const levelSampleRef = useRef(0);
 
   // derive orb state: vision/thinking/speaking take priority; else idle or rotating
   const idleState = (): OrbState => rotating ? "rotating" : "idle";
@@ -46,17 +48,42 @@ function GhostIndex(){
     return ctx;
   },[]);
 
-  // amplitude poll
+  // amplitude poll - sample at RAF but only update React state at a lower rate (throttle)
   useEffect(()=>{
-    let raf=0; const buf=new Uint8Array(256);
-    const loop=()=>{
-      const an=analyserRef.current;
-      if(an){an.getByteTimeDomainData(buf);let sum=0;for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;sum+=v*v;}setLevel(p=>p*.6+Math.min(1,Math.sqrt(sum/buf.length)*3)*.4);}
-      else setLevel(p=>p*.85);
-      raf=requestAnimationFrame(loop);
-    };
-    raf=requestAnimationFrame(loop); return()=>cancelAnimationFrame(raf);
+-    let raf=0; const buf=new Uint8Array(256);
+-    const loop=()=>{
+-      const an=analyserRef.current;
+-      if(an){an.getByteTimeDomainData(buf);let sum=0;for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;sum+=v*v;}setLevel(p=>p*.6+Math.min(1,Math.sqrt(sum/buf.length)*3)*.4);}
+-      else setLevel(p=>p*.85);
+-      raf=requestAnimationFrame(loop);
+-    };
+-    raf=requestAnimationFrame(loop); return()=>cancelAnimationFrame(raf);
++    let raf=0; const buf=new Uint8Array(256);
++    const loop=()=>{
++      const an=analyserRef.current;
++      if(an){
++        an.getByteTimeDomainData(buf);
++        let sum=0; for(let i=0;i<buf.length;i++){ const v=(buf[i]-128)/128; sum+=v*v; }
++        const sampled = Math.min(1, Math.sqrt(sum/buf.length)*3);
++        // store sampled level into a ref (no React state update here)
++        levelSampleRef.current = sampled;
++      } else {
++        // decay the sampled value when no analyser is available
++        levelSampleRef.current = levelSampleRef.current * 0.85;
++      }
++      raf=requestAnimationFrame(loop);
++    };
++    raf=requestAnimationFrame(loop);
++    return()=>cancelAnimationFrame(raf);
   },[]);
++
++  // throttle React state updates for `level` to ~10Hz to avoid re-rendering every frame
++  useEffect(()=>{
++    const id = setInterval(()=>{
++      setLevel(prev=> prev*0.6 + Math.min(1, levelSampleRef.current) * 0.4);
++    }, 100);
++    return ()=>clearInterval(id);
++  },[]);
 
   // sync rotation state
   useEffect(()=>{
@@ -148,7 +175,7 @@ function GhostIndex(){
   },[]);
 
   const isBusy=orbState==="thinking"||orbState==="speaking";
-  const label=orbState==="rotating"?"360° SHOWCASE":orbState==="vision"?"GHOST VISION":orbState==="speaking"?"RESPONDING":orbState==="thinking"?"PROCESSING":orbState==="listening"?"LISTENING":"STANDBY";
+  const label=orbState==="rotating"?"360° SHOWCASE":orbState==="vision"?"GHOST VISION":orbState==="speaking"?"RESPONDING":orbState==="thinking"?"PROCESSING":orbState==="listening"?"LISTENING":"S[...]"
 
   return(
     <div className="min-h-screen w-full hud-grid flex flex-col">
@@ -225,9 +252,9 @@ function GhostIndex(){
             <form className="flex flex-1 gap-2" onSubmit={e=>{e.preventDefault();void send(input);}}>
               <input value={input} onChange={e=>setInput(e.target.value)}
                 placeholder="Address GHOST…" disabled={isBusy}
-                className="h-12 flex-1 rounded-full border border-border bg-card/60 px-5 font-mono text-sm tracking-wide text-foreground placeholder:text-muted-foreground/60 focus:border-[var(--orb-amber)] focus:outline-none disabled:opacity-50"/>
+                className="h-12 flex-1 rounded-full border border-border bg-card/60 px-5 font-mono text-sm tracking-wide text-foreground placeholder:text-muted-foreground/60 focus:border-[var(--o[...]"/>
               <button type="submit" disabled={!input.trim()||isBusy}
-                className="h-12 rounded-full border border-[var(--orb-amber)]/60 bg-[var(--orb-orange)]/20 px-5 font-mono text-xs tracking-widest text-[var(--orb-amber)] hover:bg-[var(--orb-orange)]/40 disabled:opacity-40 transition-all">
+                className="h-12 rounded-full border border-[var(--orb-amber)]/60 bg-[var(--orb-orange)]/20 px-5 font-mono text-xs tracking-widest text-[var(--orb-amber)] hover:bg-[var(--orb-orang[...]"
                 SEND
               </button>
             </form>
