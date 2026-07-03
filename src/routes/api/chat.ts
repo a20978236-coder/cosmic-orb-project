@@ -10,7 +10,6 @@ export const Route = createFileRoute("/api/chat")({
         const key = process.env.LOVABLE_API_KEY;
         if (!key) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
 
-        // This line makes it work with both complex arrays and simple text from Siri
         const incomingMessages = body.messages || [{ role: "user", content: body.text }];
         
         const system: Msg = {
@@ -31,21 +30,20 @@ export const Route = createFileRoute("/api/chat")({
           body: JSON.stringify({ 
             model: "google/gemini-3-flash-preview",
             messages: [system, ...incomingMessages],
-            stream: true,
+            stream: false, // Turned off streaming for Siri/Shortcuts
           }),
         });
 
-        if (!upstream.ok || !upstream.body) {
+        if (!upstream.ok) {
           const text = await upstream.text().catch(() => "");
           return new Response(text || "Upstream error", { status: upstream.status });
         }
 
-        return new Response(upstream.body, {
-          headers: {
-            "Content-Type": "text-event-stream",
-            "Cache-Control": "no-cache",
-          },
-        });
+        const data = await upstream.json();
+        const reply = data.choices?.[0]?.message?.content || "I am unable to respond at the moment.";
+
+        // Return as simple JSON for the Shortcut to read
+        return Response.json({ reply });
       },
     },
   },
