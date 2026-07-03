@@ -77,14 +77,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Nexus" },
+      { name: "description", content: "Orb Weaver AI generates advanced, custom AI-powered visual art based on user-provided examples." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Nexus" },
+      { property: "og:description", content: "Orb Weaver AI generates advanced, custom AI-powered visual art based on user-provided examples." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Nexus" },
+      { name: "twitter:description", content: "Orb Weaver AI generates advanced, custom AI-powered visual art based on user-provided examples." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e67c4625-fb35-4093-bc07-26b18f655ee4/id-preview-bf8b7c71--1a077713-37c5-437d-bdd8-b1e128dbc65d.lovable.app-1783048265051.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e67c4625-fb35-4093-bc07-26b18f655ee4/id-preview-bf8b7c71--1a077713-37c5-437d-bdd8-b1e128dbc65d.lovable.app-1783048265051.png" },
     ],
     links: [
       {
