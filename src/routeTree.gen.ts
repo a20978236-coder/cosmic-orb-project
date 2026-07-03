@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as GhostVisionRouteImport } from './routes/ghost-vision'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiWorkflowRouteImport } from './routes/api/workflow'
 import { Route as ApiVisionRouteImport } from './routes/api/vision'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiSttRouteImport } from './routes/api/stt'
@@ -25,6 +26,11 @@ const GhostVisionRoute = GhostVisionRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkflowRoute = ApiWorkflowRouteImport.update({
+  id: '/api/workflow',
+  path: '/api/workflow',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiVisionRoute = ApiVisionRouteImport.update({
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/vision': typeof ApiVisionRoute
+  '/api/workflow': typeof ApiWorkflowRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/vision': typeof ApiVisionRoute
+  '/api/workflow': typeof ApiWorkflowRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/vision': typeof ApiVisionRoute
+  '/api/workflow': typeof ApiWorkflowRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/api/stt'
     | '/api/tts'
     | '/api/vision'
+    | '/api/workflow'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/api/stt'
     | '/api/tts'
     | '/api/vision'
+    | '/api/workflow'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/api/stt'
     | '/api/tts'
     | '/api/vision'
+    | '/api/workflow'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   ApiSttRoute: typeof ApiSttRoute
   ApiTtsRoute: typeof ApiTtsRoute
   ApiVisionRoute: typeof ApiVisionRoute
+  ApiWorkflowRoute: typeof ApiWorkflowRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -135,6 +148,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workflow': {
+      id: '/api/workflow'
+      path: '/api/workflow'
+      fullPath: '/api/workflow'
+      preLoaderRoute: typeof ApiWorkflowRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/vision': {
@@ -183,17 +203,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSttRoute: ApiSttRoute,
   ApiTtsRoute: ApiTtsRoute,
   ApiVisionRoute: ApiVisionRoute,
+  ApiWorkflowRoute: ApiWorkflowRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
