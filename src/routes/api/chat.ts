@@ -30,7 +30,7 @@ export const Route = createFileRoute("/api/chat")({
           body: JSON.stringify({ 
             model: "google/gemini-3-flash-preview",
             messages: [system, ...incomingMessages],
-            stream: false, // Turned off streaming for Siri/Shortcuts
+            stream: false, 
           }),
         });
 
@@ -42,8 +42,10 @@ export const Route = createFileRoute("/api/chat")({
         const data = await upstream.json();
         const reply = data.choices?.[0]?.message?.content || "I am unable to respond at the moment.";
 
-        // Return as simple JSON for the Shortcut to read
-        return Response.json({ reply });
+        // Return as PLAIN TEXT so Siri can read it instantly
+        return new Response(reply, {
+          headers: { "Content-Type": "text/plain" },
+        });
       },
     },
   },
