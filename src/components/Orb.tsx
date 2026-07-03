@@ -34,7 +34,16 @@ function OrbComponent({ state, level=0 }: { state:OrbState; level?:number }) {
   useEffect(()=>{
     const speedMul = SPEED[state];
     const isRotating = state==="rotating";
+
     const tick = ()=>{
+      // If the document is hidden, don't perform heavy updates; keep loop paused.
+      // This avoids wasting CPU & battery while the page isn't visible.
+      if (typeof document !== 'undefined' && document.hidden) {
+        // Keep checking until visible again
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
       tRef.current+=1;
       // 360° full rotation: fixed 15° pitch tilt so ALL rings are visible as it sweeps
       if (isRotating) {
@@ -60,8 +69,27 @@ function OrbComponent({ state, level=0 }: { state:OrbState; level?:number }) {
       });
       rafRef.current = requestAnimationFrame(tick);
     };
-    rafRef.current = requestAnimationFrame(tick);
-    return ()=>{ if(rafRef.current) cancelAnimationFrame(rafRef.current); };
+
+    const onVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (!document.hidden && rafRef.current == null) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else if (document.hidden && rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+
+    // Start the loop if visible
+    if (typeof document === 'undefined' || !document.hidden) {
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return ()=>{
+      if(rafRef.current) cancelAnimationFrame(rafRef.current);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   },[state]);
 
   const intensity =
