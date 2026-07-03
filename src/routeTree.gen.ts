@@ -9,14 +9,21 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WorkflowsRouteImport } from './routes/workflows'
 import { Route as GhostVisionRouteImport } from './routes/ghost-vision'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiWorkflowRouteImport } from './routes/api/workflow'
 import { Route as ApiVisionRouteImport } from './routes/api/vision'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiSttRouteImport } from './routes/api/stt'
 import { Route as ApiSimulateRouteImport } from './routes/api/simulate'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 
+const WorkflowsRoute = WorkflowsRouteImport.update({
+  id: '/workflows',
+  path: '/workflows',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GhostVisionRoute = GhostVisionRouteImport.update({
   id: '/ghost-vision',
   path: '/ghost-vision',
@@ -25,6 +32,11 @@ const GhostVisionRoute = GhostVisionRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkflowRoute = ApiWorkflowRouteImport.update({
+  id: '/api/workflow',
+  path: '/api/workflow',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiVisionRoute = ApiVisionRouteImport.update({
@@ -56,73 +68,94 @@ const ApiChatRoute = ApiChatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ghost-vision': typeof GhostVisionRoute
+  '/workflows': typeof WorkflowsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/simulate': typeof ApiSimulateRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/vision': typeof ApiVisionRoute
+  '/api/workflow': typeof ApiWorkflowRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ghost-vision': typeof GhostVisionRoute
+  '/workflows': typeof WorkflowsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/simulate': typeof ApiSimulateRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/vision': typeof ApiVisionRoute
+  '/api/workflow': typeof ApiWorkflowRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ghost-vision': typeof GhostVisionRoute
+  '/workflows': typeof WorkflowsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/simulate': typeof ApiSimulateRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/vision': typeof ApiVisionRoute
+  '/api/workflow': typeof ApiWorkflowRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/ghost-vision'
+    | '/workflows'
     | '/api/chat'
     | '/api/simulate'
     | '/api/stt'
     | '/api/tts'
     | '/api/vision'
+    | '/api/workflow'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/ghost-vision'
+    | '/workflows'
     | '/api/chat'
     | '/api/simulate'
     | '/api/stt'
     | '/api/tts'
     | '/api/vision'
+    | '/api/workflow'
   id:
     | '__root__'
     | '/'
     | '/ghost-vision'
+    | '/workflows'
     | '/api/chat'
     | '/api/simulate'
     | '/api/stt'
     | '/api/tts'
     | '/api/vision'
+    | '/api/workflow'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   GhostVisionRoute: typeof GhostVisionRoute
+  WorkflowsRoute: typeof WorkflowsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiSimulateRoute: typeof ApiSimulateRoute
   ApiSttRoute: typeof ApiSttRoute
   ApiTtsRoute: typeof ApiTtsRoute
   ApiVisionRoute: typeof ApiVisionRoute
+  ApiWorkflowRoute: typeof ApiWorkflowRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/workflows': {
+      id: '/workflows'
+      path: '/workflows'
+      fullPath: '/workflows'
+      preLoaderRoute: typeof WorkflowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ghost-vision': {
       id: '/ghost-vision'
       path: '/ghost-vision'
@@ -135,6 +168,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workflow': {
+      id: '/api/workflow'
+      path: '/api/workflow'
+      fullPath: '/api/workflow'
+      preLoaderRoute: typeof ApiWorkflowRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/vision': {
@@ -178,22 +218,14 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   GhostVisionRoute: GhostVisionRoute,
+  WorkflowsRoute: WorkflowsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiSimulateRoute: ApiSimulateRoute,
   ApiSttRoute: ApiSttRoute,
   ApiTtsRoute: ApiTtsRoute,
   ApiVisionRoute: ApiVisionRoute,
+  ApiWorkflowRoute: ApiWorkflowRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
