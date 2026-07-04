@@ -100,7 +100,7 @@ export function EngineeringLab() {
         </Float>
 
         {/* Holographic Grid Floor */}
-        <gridHelper args={[10, 20, "#00f2ff", "#00f2ff"]} position={[0, -1, 0]} rotation={[0, 0, 0]} opacity={0.1} transparent />
+        <gridHelper args={[10, 20, "#00f2ff", "#00f2ff"]} position={[0, -1, 0]} rotation={[0, 0, 0]} />
       </Canvas>
     </div>
   );
