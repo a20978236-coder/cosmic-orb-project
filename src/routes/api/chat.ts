@@ -27,24 +27,23 @@ export const Route = createFileRoute("/api/chat")({
             Authorization: `Bearer ${key}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             model: "google/gemini-3-flash-preview",
             messages: [system, ...incomingMessages],
-            stream: false, 
+            stream: true,
           }),
         });
 
-        if (!upstream.ok) {
+        if (!upstream.ok || !upstream.body) {
           const text = await upstream.text().catch(() => "");
           return new Response(text || "Upstream error", { status: upstream.status });
         }
 
-        const data = await upstream.json();
-        const reply = data.choices?.[0]?.message?.content || "I am unable to respond at the moment.";
-
-        // Return as PLAIN TEXT so Siri can read it instantly
-        return new Response(reply, {
-          headers: { "Content-Type": "text/plain" },
+        return new Response(upstream.body, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+          },
         });
       },
     },
