@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Float } from "@react-three/drei";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createParser } from "eventsource-parser";
 import * as THREE from "three";
 
@@ -94,7 +94,7 @@ function GeneratedModel({ parts, troubleshooting }: { parts: Part[]; troubleshoo
   );
 }
 
-export function EngineeringLab() {
+export function EngineeringLab({ command }: { command?: { prompt: string; seq: number } }) {
   const [troubleshooting, setTroubleshooting] = useState(false);
   const [parts, setParts] = useState<Part[]>([]);
   const [analysis, setAnalysis] = useState("");
@@ -104,6 +104,7 @@ export function EngineeringLab() {
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const pendingImageRef = useRef<{ base64: string; mimeType: string; name: string } | null>(null);
+  const lastSeqRef = useRef(0);
 
   const runVision = useCallback(async (promptText: string) => {
     const img = pendingImageRef.current;
@@ -166,6 +167,16 @@ export function EngineeringLab() {
     setImageUrl(URL.createObjectURL(file));
     void runVision(prompt.trim() || "Analyze this structure for a 3D rebuild.");
   }, [imageUrl, prompt, runVision]);
+
+  useEffect(() => {
+    if (!command || command.seq === lastSeqRef.current) return;
+    lastSeqRef.current = command.seq;
+    if (!pendingImageRef.current) {
+      setErr("No image attached — drop one in first.");
+      return;
+    }
+    void runVision(command.prompt || "Rebuild the structure from the image.");
+  }, [command, runVision]);
 
   return (
     <div className="w-full h-full relative bg-black/40 rounded-3xl overflow-hidden border border-[#00f2ff]/20 backdrop-blur-md flex flex-col">

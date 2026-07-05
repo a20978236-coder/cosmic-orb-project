@@ -17,6 +17,7 @@ import { Route as ApiVisionRouteImport } from './routes/api/vision'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiSttRouteImport } from './routes/api/stt'
 import { Route as ApiSimulateRouteImport } from './routes/api/simulate'
+import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as ApiImageRouteImport } from './routes/api/image'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 
@@ -60,6 +61,11 @@ const ApiSimulateRoute = ApiSimulateRouteImport.update({
   path: '/api/simulate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSearchRoute = ApiSearchRouteImport.update({
+  id: '/api/search',
+  path: '/api/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiImageRoute = ApiImageRouteImport.update({
   id: '/api/image',
   path: '/api/image',
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/workflows': typeof WorkflowsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/image': typeof ApiImageRoute
+  '/api/search': typeof ApiSearchRoute
   '/api/simulate': typeof ApiSimulateRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/workflows': typeof WorkflowsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/image': typeof ApiImageRoute
+  '/api/search': typeof ApiSearchRoute
   '/api/simulate': typeof ApiSimulateRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/workflows': typeof WorkflowsRoute
   '/api/chat': typeof ApiChatRoute
   '/api/image': typeof ApiImageRoute
+  '/api/search': typeof ApiSearchRoute
   '/api/simulate': typeof ApiSimulateRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/workflows'
     | '/api/chat'
     | '/api/image'
+    | '/api/search'
     | '/api/simulate'
     | '/api/stt'
     | '/api/tts'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/workflows'
     | '/api/chat'
     | '/api/image'
+    | '/api/search'
     | '/api/simulate'
     | '/api/stt'
     | '/api/tts'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/workflows'
     | '/api/chat'
     | '/api/image'
+    | '/api/search'
     | '/api/simulate'
     | '/api/stt'
     | '/api/tts'
@@ -153,6 +165,7 @@ export interface RootRouteChildren {
   WorkflowsRoute: typeof WorkflowsRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiImageRoute: typeof ApiImageRoute
+  ApiSearchRoute: typeof ApiSearchRoute
   ApiSimulateRoute: typeof ApiSimulateRoute
   ApiSttRoute: typeof ApiSttRoute
   ApiTtsRoute: typeof ApiTtsRoute
@@ -218,6 +231,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSimulateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/search': {
+      id: '/api/search'
+      path: '/api/search'
+      fullPath: '/api/search'
+      preLoaderRoute: typeof ApiSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/image': {
       id: '/api/image'
       path: '/api/image'
@@ -241,6 +261,7 @@ const rootRouteChildren: RootRouteChildren = {
   WorkflowsRoute: WorkflowsRoute,
   ApiChatRoute: ApiChatRoute,
   ApiImageRoute: ApiImageRoute,
+  ApiSearchRoute: ApiSearchRoute,
   ApiSimulateRoute: ApiSimulateRoute,
   ApiSttRoute: ApiSttRoute,
   ApiTtsRoute: ApiTtsRoute,
