@@ -16,8 +16,24 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant"; content: string; imageUrl?: string; hits?: { title: string; url: string; description?: string }[] };
 type Attachment = { name: string; mimeType: string; base64: string; url: string };
+
+type Action = { type: "OPEN_LAB" | "CLOSE_LAB" | "REBUILD" | "IMAGE" | "SEARCH"; arg?: string };
+const ACTION_RE = /\[\[ACT:([A-Z_]+)(?:\|([^\]]*))?\]\]/g;
+function parseActions(text: string): Action[] {
+  const out: Action[] = [];
+  for (const m of text.matchAll(ACTION_RE)) {
+    const type = m[1] as Action["type"];
+    if (["OPEN_LAB", "CLOSE_LAB", "REBUILD", "IMAGE", "SEARCH"].includes(type)) {
+      out.push({ type, arg: m[2]?.trim() });
+    }
+  }
+  return out;
+}
+function stripActions(text: string): string {
+  return text.replace(ACTION_RE, "").replace(/\s{2,}/g, " ").trim();
+}
 
 function Index() {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -27,6 +43,7 @@ function Index() {
   const [streaming, setStreaming] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showLab, setShowLab] = useState(false);
+  const [labCommand, setLabCommand] = useState<{ prompt: string; seq: number } | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -220,7 +237,7 @@ function Index() {
               const delta = j.choices?.[0]?.delta?.content ?? "";
               if (delta) {
                 full += delta;
-                setStreaming(full);
+                setStreaming(stripActions(full));
               }
             } catch {
               /* ignore */
@@ -239,13 +256,66 @@ function Index() {
         return;
       }
 
-      setMessages((m) => [...m, { role: "assistant", content: full }]);
+      const spoken = stripActions(full).trim();
+      setMessages((m) => [...m, { role: "assistant", content: spoken || "(action)" }]);
       setStreaming("");
-      if (full.trim()) await speak(full);
+
+      // Execute any action tags emitted by NEXUS.
+      const actions = parseActions(full);
+      for (const a of actions) {
+        if (a.type === "OPEN_LAB") setShowLab(true);
+        else if (a.type === "CLOSE_LAB") setShowLab(false);
+        else if (a.type === "REBUILD") {
+          setShowLab(true);
+          setLabCommand({ prompt: a.arg || "", seq: Date.now() });
+        } else if (a.type === "IMAGE" && a.arg) {
+          void generateImage(a.arg);
+        } else if (a.type === "SEARCH" && a.arg) {
+          void runSearch(a.arg);
+        }
+      }
+
+      if (spoken) await speak(spoken);
       else setOrbState("idle");
     },
     [messages, speak, attachments],
   );
+
+  const generateImage = useCallback(async (prompt: string) => {
+    try {
+      const res = await fetch("/api/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!res.ok) throw new Error(`Image ${res.status}`);
+      const { url } = (await res.json()) as { url: string };
+      setMessages((m) => [...m, { role: "assistant", content: `[image] ${prompt}`, imageUrl: url }]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Image generation failed");
+    }
+  }, []);
+
+  const runSearch = useCallback(async (query: string) => {
+    try {
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      const j = (await res.json()) as { hits?: { title: string; url: string; description?: string }[]; error?: string };
+      if (j.error && !j.hits?.length) {
+        setMessages((m) => [...m, { role: "assistant", content: j.error! }]);
+        return;
+      }
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: `Search: ${query}`, hits: j.hits ?? [] },
+      ]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Search failed");
+    }
+  }, []);
 
   const onFilesPicked = useCallback(async (files: FileList | null) => {
     if (!files || !files.length) return;
@@ -380,7 +450,7 @@ function Index() {
         <section className="my-6 flex flex-1 flex-col items-center justify-center gap-6">
           {showLab ? (
             <div className="w-full max-w-2xl aspect-square md:aspect-video">
-              <EngineeringLab />
+              <EngineeringLab command={labCommand ?? undefined} />
             </div>
           ) : (
             <Orb state={orbState} level={level} />
@@ -407,6 +477,34 @@ function Index() {
                   {m.role === "user" ? "YOU »" : "NEXUS »"}
                 </span>
                 <span className="text-foreground/90">{m.content}</span>
+                {m.imageUrl && (
+                  <div className="mt-2">
+                    <img
+                      src={m.imageUrl}
+                      alt="generated"
+                      className="max-h-64 rounded border border-[var(--orb-amber)]/30"
+                    />
+                  </div>
+                )}
+                {m.hits && m.hits.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {m.hits.map((h, j) => (
+                      <li key={j} className="text-xs">
+                        <a
+                          href={h.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[var(--orb-amber)] underline"
+                        >
+                          {h.title}
+                        </a>
+                        {h.description && (
+                          <span className="ml-2 text-muted-foreground">{h.description}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
             {streaming && (
