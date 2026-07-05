@@ -19,6 +19,22 @@ export const Route = createFileRoute("/")({
 type Msg = { role: "user" | "assistant"; content: string; imageUrl?: string; hits?: { title: string; url: string; description?: string }[] };
 type Attachment = { name: string; mimeType: string; base64: string; url: string };
 
+type Action = { type: "OPEN_LAB" | "CLOSE_LAB" | "REBUILD" | "IMAGE" | "SEARCH"; arg?: string };
+const ACTION_RE = /\[\[ACT:([A-Z_]+)(?:\|([^\]]*))?\]\]/g;
+function parseActions(text: string): Action[] {
+  const out: Action[] = [];
+  for (const m of text.matchAll(ACTION_RE)) {
+    const type = m[1] as Action["type"];
+    if (["OPEN_LAB", "CLOSE_LAB", "REBUILD", "IMAGE", "SEARCH"].includes(type)) {
+      out.push({ type, arg: m[2]?.trim() });
+    }
+  }
+  return out;
+}
+function stripActions(text: string): string {
+  return text.replace(ACTION_RE, "").replace(/\s{2,}/g, " ").trim();
+}
+
 function Index() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
