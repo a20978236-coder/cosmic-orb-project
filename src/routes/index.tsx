@@ -477,6 +477,34 @@ function Index() {
                   {m.role === "user" ? "YOU »" : "NEXUS »"}
                 </span>
                 <span className="text-foreground/90">{m.content}</span>
+                {m.imageUrl && (
+                  <div className="mt-2">
+                    <img
+                      src={m.imageUrl}
+                      alt="generated"
+                      className="max-h-64 rounded border border-[var(--orb-amber)]/30"
+                    />
+                  </div>
+                )}
+                {m.hits && m.hits.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {m.hits.map((h, j) => (
+                      <li key={j} className="text-xs">
+                        <a
+                          href={h.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[var(--orb-amber)] underline"
+                        >
+                          {h.title}
+                        </a>
+                        {h.description && (
+                          <span className="ml-2 text-muted-foreground">{h.description}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
             {streaming && (
