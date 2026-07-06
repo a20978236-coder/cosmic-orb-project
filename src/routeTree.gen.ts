@@ -14,6 +14,8 @@ import { Route as GhostVisionRouteImport } from './routes/ghost-vision'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiWorkflowRouteImport } from './routes/api/workflow'
 import { Route as ApiVisionRouteImport } from './routes/api/vision'
+import { Route as ApiVideoStatusRouteImport } from './routes/api/video-status'
+import { Route as ApiVideoRouteImport } from './routes/api/video'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiSttRouteImport } from './routes/api/stt'
 import { Route as ApiSimulateRouteImport } from './routes/api/simulate'
@@ -44,6 +46,16 @@ const ApiWorkflowRoute = ApiWorkflowRouteImport.update({
 const ApiVisionRoute = ApiVisionRouteImport.update({
   id: '/api/vision',
   path: '/api/vision',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVideoStatusRoute = ApiVideoStatusRouteImport.update({
+  id: '/api/video-status',
+  path: '/api/video-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVideoRoute = ApiVideoRouteImport.update({
+  id: '/api/video',
+  path: '/api/video',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTtsRoute = ApiTtsRouteImport.update({
@@ -87,6 +99,8 @@ export interface FileRoutesByFullPath {
   '/api/simulate': typeof ApiSimulateRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/video': typeof ApiVideoRoute
+  '/api/video-status': typeof ApiVideoStatusRoute
   '/api/vision': typeof ApiVisionRoute
   '/api/workflow': typeof ApiWorkflowRoute
 }
@@ -100,6 +114,8 @@ export interface FileRoutesByTo {
   '/api/simulate': typeof ApiSimulateRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/video': typeof ApiVideoRoute
+  '/api/video-status': typeof ApiVideoStatusRoute
   '/api/vision': typeof ApiVisionRoute
   '/api/workflow': typeof ApiWorkflowRoute
 }
@@ -114,6 +130,8 @@ export interface FileRoutesById {
   '/api/simulate': typeof ApiSimulateRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/video': typeof ApiVideoRoute
+  '/api/video-status': typeof ApiVideoStatusRoute
   '/api/vision': typeof ApiVisionRoute
   '/api/workflow': typeof ApiWorkflowRoute
 }
@@ -129,6 +147,8 @@ export interface FileRouteTypes {
     | '/api/simulate'
     | '/api/stt'
     | '/api/tts'
+    | '/api/video'
+    | '/api/video-status'
     | '/api/vision'
     | '/api/workflow'
   fileRoutesByTo: FileRoutesByTo
@@ -142,6 +162,8 @@ export interface FileRouteTypes {
     | '/api/simulate'
     | '/api/stt'
     | '/api/tts'
+    | '/api/video'
+    | '/api/video-status'
     | '/api/vision'
     | '/api/workflow'
   id:
@@ -155,6 +177,8 @@ export interface FileRouteTypes {
     | '/api/simulate'
     | '/api/stt'
     | '/api/tts'
+    | '/api/video'
+    | '/api/video-status'
     | '/api/vision'
     | '/api/workflow'
   fileRoutesById: FileRoutesById
@@ -169,6 +193,8 @@ export interface RootRouteChildren {
   ApiSimulateRoute: typeof ApiSimulateRoute
   ApiSttRoute: typeof ApiSttRoute
   ApiTtsRoute: typeof ApiTtsRoute
+  ApiVideoRoute: typeof ApiVideoRoute
+  ApiVideoStatusRoute: typeof ApiVideoStatusRoute
   ApiVisionRoute: typeof ApiVisionRoute
   ApiWorkflowRoute: typeof ApiWorkflowRoute
 }
@@ -208,6 +234,20 @@ declare module '@tanstack/react-router' {
       path: '/api/vision'
       fullPath: '/api/vision'
       preLoaderRoute: typeof ApiVisionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/video-status': {
+      id: '/api/video-status'
+      path: '/api/video-status'
+      fullPath: '/api/video-status'
+      preLoaderRoute: typeof ApiVideoStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/video': {
+      id: '/api/video'
+      path: '/api/video'
+      fullPath: '/api/video'
+      preLoaderRoute: typeof ApiVideoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tts': {
@@ -265,6 +305,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSimulateRoute: ApiSimulateRoute,
   ApiSttRoute: ApiSttRoute,
   ApiTtsRoute: ApiTtsRoute,
+  ApiVideoRoute: ApiVideoRoute,
+  ApiVideoStatusRoute: ApiVideoStatusRoute,
   ApiVisionRoute: ApiVisionRoute,
   ApiWorkflowRoute: ApiWorkflowRoute,
 }
