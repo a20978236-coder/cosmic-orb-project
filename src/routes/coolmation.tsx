@@ -13,7 +13,14 @@ export const Route = createFileRoute("/coolmation")({
   component: Coolmation,
 });
 
-type Clip = { id: string; prompt: string; url?: string; status: "processing" | "completed" | "failed"; error?: string };
+type Clip = {
+  id: string;
+  prompt: string;
+  url?: string;
+  status: "processing" | "completed" | "failed";
+  error?: string;
+  refUrl?: string;
+};
 
 function Coolmation() {
   const [prompt, setPrompt] = useState("");
@@ -22,6 +29,8 @@ function Coolmation() {
   const [clips, setClips] = useState<Clip[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refImage, setRefImage] = useState<{ dataUrl: string; previewUrl: string; name: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const pollersRef = useRef<Record<string, number>>({});
 
   const pollClip = useCallback((id: string) => {
@@ -58,7 +67,28 @@ function Coolmation() {
   useEffect(() => {
     return () => {
       Object.values(pollersRef.current).forEach((t) => window.clearTimeout(t));
+      if (refImage) URL.revokeObjectURL(refImage.previewUrl);
     };
+  }, [refImage]);
+
+  const onPickImage = useCallback(async (file: File | undefined) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let bin = "";
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    const dataUrl = `data:${file.type};base64,${btoa(bin)}`;
+    setRefImage((prev) => {
+      if (prev) URL.revokeObjectURL(prev.previewUrl);
+      return { dataUrl, previewUrl: URL.createObjectURL(file), name: file.name };
+    });
+  }, []);
+
+  const clearImage = useCallback(() => {
+    setRefImage((prev) => {
+      if (prev) URL.revokeObjectURL(prev.previewUrl);
+      return null;
+    });
   }, []);
 
   const submit = useCallback(
@@ -72,23 +102,32 @@ function Coolmation() {
         const res = await fetch("/api/video", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: p, aspect_ratio: aspect, duration }),
+          body: JSON.stringify({
+            prompt: p,
+            aspect_ratio: aspect,
+            duration,
+            image_url: refImage?.dataUrl,
+          }),
         });
         if (!res.ok) {
           const t = await res.text().catch(() => "");
           throw new Error(t || `Submit ${res.status}`);
         }
         const { request_id } = (await res.json()) as { request_id: string };
-        setClips((cs) => [{ id: request_id, prompt: p, status: "processing" }, ...cs]);
+        setClips((cs) => [
+          { id: request_id, prompt: p, status: "processing", refUrl: refImage?.previewUrl },
+          ...cs,
+        ]);
         pollClip(request_id);
         setPrompt("");
+        // keep image for reuse; clear if you want single-shot
       } catch (err) {
         setError(err instanceof Error ? err.message : "Submission failed");
       } finally {
         setBusy(false);
       }
     },
-    [prompt, aspect, duration, pollClip],
+    [prompt, aspect, duration, refImage, pollClip],
   );
 
   return (
@@ -117,6 +156,40 @@ function Coolmation() {
             className="rounded-md border border-border bg-black/40 p-3 font-mono text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-[var(--orb-amber)] focus:outline-none"
           />
           <div className="flex flex-wrap items-center gap-3">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                void onPickImage(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            {refImage ? (
+              <div className="flex items-center gap-2 rounded border border-[var(--orb-amber)]/40 bg-black/40 p-1 pr-2">
+                <img src={refImage.previewUrl} alt="reference" className="h-10 w-10 rounded object-cover" />
+                <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[120px]">
+                  {refImage.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearImage}
+                  className="font-mono text-xs text-[var(--orb-amber)] hover:opacity-70"
+                  aria-label="Remove reference"
+                >
+                  ×
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="rounded border border-border bg-black/40 px-3 py-1 font-mono text-xs text-muted-foreground hover:border-[var(--orb-amber)] hover:text-[var(--orb-amber)]"
+              >
+                + REF IMAGE
+              </button>
+            )}
             <label className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
               ASPECT
               <select
@@ -162,7 +235,12 @@ function Coolmation() {
           {clips.map((c) => (
             <article key={c.id} className="rounded-lg border border-border bg-card/40 p-3 backdrop-blur-sm">
               <div className="mb-2 flex items-center justify-between font-mono text-[10px] tracking-widest">
-                <span className="text-muted-foreground truncate max-w-[70%]">{c.prompt}</span>
+                <div className="flex items-center gap-2 max-w-[70%]">
+                  {c.refUrl && (
+                    <img src={c.refUrl} alt="ref" className="h-6 w-6 rounded object-cover border border-[var(--orb-amber)]/40" />
+                  )}
+                  <span className="text-muted-foreground truncate">{c.prompt}</span>
+                </div>
                 <span
                   className={
                     c.status === "completed"
