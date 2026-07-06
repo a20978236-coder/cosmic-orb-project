@@ -10,6 +10,7 @@ export const Route = createFileRoute("/api/video")({
           aspect_ratio?: string;
           resolution?: VideoResolution;
           duration?: number;
+          image_url?: string;
         };
 
         const prompt = body.prompt?.trim();
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/api/video")({
             aspect_ratio: body.aspect_ratio,
             resolution: body.resolution,
             duration: body.duration,
+            image_url: body.image_url,
           });
           return Response.json({ request_id });
         } catch (e) {
