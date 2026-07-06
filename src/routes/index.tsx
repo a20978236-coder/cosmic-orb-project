@@ -437,6 +437,9 @@ function Index() {
             <span className="hud-chip hidden sm:inline">PING {metrics.ping}ms</span>
             <span className="hud-chip">{statusLabel}</span>
             
+            <Link to="/coolmation" className="hud-chip cursor-pointer hover:opacity-80 transition-all select-none">
+              🎬 COOLMATION
+            </Link>
             <button 
               onClick={() => setShowLab(!showLab)}
               className="hud-chip cursor-pointer hover:opacity-80 transition-all select-none"

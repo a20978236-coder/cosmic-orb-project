@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkflowsRouteImport } from './routes/workflows'
 import { Route as GhostVisionRouteImport } from './routes/ghost-vision'
+import { Route as CoolmationRouteImport } from './routes/coolmation'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiWorkflowRouteImport } from './routes/api/workflow'
 import { Route as ApiVisionRouteImport } from './routes/api/vision'
@@ -31,6 +32,11 @@ const WorkflowsRoute = WorkflowsRouteImport.update({
 const GhostVisionRoute = GhostVisionRouteImport.update({
   id: '/ghost-vision',
   path: '/ghost-vision',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CoolmationRoute = CoolmationRouteImport.update({
+  id: '/coolmation',
+  path: '/coolmation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -91,6 +97,7 @@ const ApiChatRoute = ApiChatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/coolmation': typeof CoolmationRoute
   '/ghost-vision': typeof GhostVisionRoute
   '/workflows': typeof WorkflowsRoute
   '/api/chat': typeof ApiChatRoute
@@ -106,6 +113,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/coolmation': typeof CoolmationRoute
   '/ghost-vision': typeof GhostVisionRoute
   '/workflows': typeof WorkflowsRoute
   '/api/chat': typeof ApiChatRoute
@@ -122,6 +130,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/coolmation': typeof CoolmationRoute
   '/ghost-vision': typeof GhostVisionRoute
   '/workflows': typeof WorkflowsRoute
   '/api/chat': typeof ApiChatRoute
@@ -139,6 +148,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/coolmation'
     | '/ghost-vision'
     | '/workflows'
     | '/api/chat'
@@ -154,6 +164,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/coolmation'
     | '/ghost-vision'
     | '/workflows'
     | '/api/chat'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/coolmation'
     | '/ghost-vision'
     | '/workflows'
     | '/api/chat'
@@ -185,6 +197,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CoolmationRoute: typeof CoolmationRoute
   GhostVisionRoute: typeof GhostVisionRoute
   WorkflowsRoute: typeof WorkflowsRoute
   ApiChatRoute: typeof ApiChatRoute
@@ -213,6 +226,13 @@ declare module '@tanstack/react-router' {
       path: '/ghost-vision'
       fullPath: '/ghost-vision'
       preLoaderRoute: typeof GhostVisionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coolmation': {
+      id: '/coolmation'
+      path: '/coolmation'
+      fullPath: '/coolmation'
+      preLoaderRoute: typeof CoolmationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -297,6 +317,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CoolmationRoute: CoolmationRoute,
   GhostVisionRoute: GhostVisionRoute,
   WorkflowsRoute: WorkflowsRoute,
   ApiChatRoute: ApiChatRoute,
