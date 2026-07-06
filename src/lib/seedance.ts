@@ -9,8 +9,8 @@
 
 const MUAPI_BASE = "https://api.muapi.ai/api/v1";
 
-// Seedance 2 Mini text-to-video endpoint (cheapest/fastest tier).
 const T2V_ENDPOINT = `${MUAPI_BASE}/seedance-2-mini-text-to-video`;
+const I2V_ENDPOINT = `${MUAPI_BASE}/seedance-2-mini-image-to-video`;
 
 export type VideoResolution = "480p" | "720p";
 
@@ -19,6 +19,8 @@ export type SubmitVideoParams = {
   aspect_ratio?: string;
   resolution?: VideoResolution;
   duration?: number;
+  /** Optional reference image as a public URL or data:image/...;base64,... URL. */
+  image_url?: string;
 };
 
 export type VideoStatusResult =
@@ -42,21 +44,26 @@ export async function submitVideo({
   aspect_ratio = "16:9",
   resolution = "480p",
   duration = 5,
+  image_url,
 }: SubmitVideoParams): Promise<string> {
   const apiKey = getApiKey();
 
-  const res = await fetch(T2V_ENDPOINT, {
+  const endpoint = image_url ? I2V_ENDPOINT : T2V_ENDPOINT;
+  const body: Record<string, unknown> = {
+    prompt,
+    aspect_ratio,
+    duration,
+    quality: "basic",
+  };
+  if (image_url) body.image_url = image_url;
+
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "x-api-key": apiKey,
     },
-    body: JSON.stringify({
-      prompt,
-      aspect_ratio,
-      duration,
-      quality: "basic",
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
