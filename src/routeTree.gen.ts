@@ -20,6 +20,7 @@ import { Route as ApiSttRouteImport } from './routes/api/stt'
 import { Route as ApiSimulateRouteImport } from './routes/api/simulate'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as ApiImageRouteImport } from './routes/api/image'
+import { Route as ApiCoolmationRouteImport } from './routes/api/coolmation'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 
 const WorkflowsRoute = WorkflowsRouteImport.update({
@@ -77,6 +78,11 @@ const ApiImageRoute = ApiImageRouteImport.update({
   path: '/api/image',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCoolmationRoute = ApiCoolmationRouteImport.update({
+  id: '/api/coolmation',
+  path: '/api/coolmation',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/ghost-vision': typeof GhostVisionRoute
   '/workflows': typeof WorkflowsRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/coolmation': typeof ApiCoolmationRoute
   '/api/image': typeof ApiImageRoute
   '/api/search': typeof ApiSearchRoute
   '/api/simulate': typeof ApiSimulateRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/ghost-vision': typeof GhostVisionRoute
   '/workflows': typeof WorkflowsRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/coolmation': typeof ApiCoolmationRoute
   '/api/image': typeof ApiImageRoute
   '/api/search': typeof ApiSearchRoute
   '/api/simulate': typeof ApiSimulateRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/ghost-vision': typeof GhostVisionRoute
   '/workflows': typeof WorkflowsRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/coolmation': typeof ApiCoolmationRoute
   '/api/image': typeof ApiImageRoute
   '/api/search': typeof ApiSearchRoute
   '/api/simulate': typeof ApiSimulateRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/ghost-vision'
     | '/workflows'
     | '/api/chat'
+    | '/api/coolmation'
     | '/api/image'
     | '/api/search'
     | '/api/simulate'
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/ghost-vision'
     | '/workflows'
     | '/api/chat'
+    | '/api/coolmation'
     | '/api/image'
     | '/api/search'
     | '/api/simulate'
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/ghost-vision'
     | '/workflows'
     | '/api/chat'
+    | '/api/coolmation'
     | '/api/image'
     | '/api/search'
     | '/api/simulate'
@@ -177,6 +189,7 @@ export interface RootRouteChildren {
   GhostVisionRoute: typeof GhostVisionRoute
   WorkflowsRoute: typeof WorkflowsRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiCoolmationRoute: typeof ApiCoolmationRoute
   ApiImageRoute: typeof ApiImageRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSimulateRoute: typeof ApiSimulateRoute
@@ -265,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiImageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/coolmation': {
+      id: '/api/coolmation'
+      path: '/api/coolmation'
+      fullPath: '/api/coolmation'
+      preLoaderRoute: typeof ApiCoolmationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -281,6 +301,7 @@ const rootRouteChildren: RootRouteChildren = {
   GhostVisionRoute: GhostVisionRoute,
   WorkflowsRoute: WorkflowsRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiCoolmationRoute: ApiCoolmationRoute,
   ApiImageRoute: ApiImageRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiSimulateRoute: ApiSimulateRoute,
