@@ -5,9 +5,9 @@ export const Route = createFileRoute("/coolmation")({
   head: () => ({
     meta: [
       { title: "COOLMATION — NEXUS video lab" },
-      { name: "description", content: "Generate short cool animations from a text prompt via Seedance 2 Mini." },
+      { name: "description", content: "Generate looping frame-by-frame animations from a text prompt — no API keys required." },
       { property: "og:title", content: "COOLMATION — NEXUS video lab" },
-      { property: "og:description", content: "Generate short cool animations from a text prompt via Seedance 2 Mini." },
+      { property: "og:description", content: "Generate looping frame-by-frame animations from a text prompt — no API keys required." },
     ],
   }),
   component: Coolmation,
@@ -16,118 +16,64 @@ export const Route = createFileRoute("/coolmation")({
 type Clip = {
   id: string;
   prompt: string;
-  url?: string;
+  frames: string[];
   status: "processing" | "completed" | "failed";
   error?: string;
-  refUrl?: string;
+  frameCount: number;
+  fps: number;
 };
 
 function Coolmation() {
   const [prompt, setPrompt] = useState("");
-  const [aspect, setAspect] = useState("16:9");
-  const [duration, setDuration] = useState(5);
+  const [frameCount, setFrameCount] = useState(4);
+  const [fps, setFps] = useState(6);
   const [clips, setClips] = useState<Clip[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [refImage, setRefImage] = useState<{ dataUrl: string; previewUrl: string; name: string } | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const pollersRef = useRef<Record<string, number>>({});
-
-  const pollClip = useCallback((id: string) => {
-    const tick = async () => {
-      try {
-        const res = await fetch("/api/video-status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ request_id: id }),
-        });
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const j = (await res.json()) as
-          | { status: "processing" }
-          | { status: "completed"; url: string }
-          | { status: "failed"; error: string };
-        setClips((cs) => cs.map((c) => (c.id === id ? { ...c, ...j } : c)));
-        if (j.status === "processing") {
-          pollersRef.current[id] = window.setTimeout(tick, 4000);
-        } else {
-          delete pollersRef.current[id];
-        }
-      } catch (e) {
-        setClips((cs) =>
-          cs.map((c) =>
-            c.id === id ? { ...c, status: "failed", error: e instanceof Error ? e.message : "poll failed" } : c,
-          ),
-        );
-        delete pollersRef.current[id];
-      }
-    };
-    tick();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      Object.values(pollersRef.current).forEach((t) => window.clearTimeout(t));
-      if (refImage) URL.revokeObjectURL(refImage.previewUrl);
-    };
-  }, [refImage]);
-
-  const onPickImage = useCallback(async (file: File | undefined) => {
-    if (!file || !file.type.startsWith("image/")) return;
-    const buf = await file.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    let bin = "";
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    const dataUrl = `data:${file.type};base64,${btoa(bin)}`;
-    setRefImage((prev) => {
-      if (prev) URL.revokeObjectURL(prev.previewUrl);
-      return { dataUrl, previewUrl: URL.createObjectURL(file), name: file.name };
-    });
-  }, []);
-
-  const clearImage = useCallback(() => {
-    setRefImage((prev) => {
-      if (prev) URL.revokeObjectURL(prev.previewUrl);
-      return null;
-    });
-  }, []);
 
   const submit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       const p = prompt.trim();
       if (!p) return;
+      const id = crypto.randomUUID();
+      const initial: Clip = {
+        id,
+        prompt: p,
+        frames: [],
+        status: "processing",
+        frameCount,
+        fps,
+      };
+      setClips((cs) => [initial, ...cs]);
       setBusy(true);
       setError(null);
       try {
-        const res = await fetch("/api/video", {
+        const res = await fetch("/api/coolmation", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: p,
-            aspect_ratio: aspect,
-            duration,
-            image_url: refImage?.dataUrl,
-          }),
+          body: JSON.stringify({ prompt: p, frames: frameCount }),
         });
         if (!res.ok) {
           const t = await res.text().catch(() => "");
-          throw new Error(t || `Submit ${res.status}`);
+          throw new Error(t || `Generate ${res.status}`);
         }
-        const { request_id } = (await res.json()) as { request_id: string };
-        setClips((cs) => [
-          { id: request_id, prompt: p, status: "processing", refUrl: refImage?.previewUrl },
-          ...cs,
-        ]);
-        pollClip(request_id);
+        const { frames } = (await res.json()) as { frames: string[] };
+        setClips((cs) =>
+          cs.map((c) => (c.id === id ? { ...c, frames, status: "completed" } : c)),
+        );
         setPrompt("");
-        // keep image for reuse; clear if you want single-shot
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Submission failed");
+        const message = err instanceof Error ? err.message : "Generation failed";
+        setError(message);
+        setClips((cs) =>
+          cs.map((c) => (c.id === id ? { ...c, status: "failed", error: message } : c)),
+        );
       } finally {
         setBusy(false);
       }
     },
-    [prompt, aspect, duration, refImage, pollClip],
+    [prompt, frameCount, fps],
   );
 
   return (
@@ -144,7 +90,7 @@ function Coolmation() {
         </header>
 
         <p className="mt-4 font-mono text-xs tracking-widest text-muted-foreground">
-          TEXT → SHORT ANIMATION · SEEDANCE 2 MINI · ~$0.07 / SEC
+          TEXT → FRAME LOOP · POWERED BY LOVABLE AI · NO API KEY
         </p>
 
         <form onSubmit={submit} className="mt-6 flex flex-col gap-3 rounded-lg border border-border bg-card/40 p-4 backdrop-blur-sm">
@@ -156,61 +102,28 @@ function Coolmation() {
             className="rounded-md border border-border bg-black/40 p-3 font-mono text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-[var(--orb-amber)] focus:outline-none"
           />
           <div className="flex flex-wrap items-center gap-3">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                void onPickImage(e.target.files?.[0]);
-                e.target.value = "";
-              }}
-            />
-            {refImage ? (
-              <div className="flex items-center gap-2 rounded border border-[var(--orb-amber)]/40 bg-black/40 p-1 pr-2">
-                <img src={refImage.previewUrl} alt="reference" className="h-10 w-10 rounded object-cover" />
-                <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[120px]">
-                  {refImage.name}
-                </span>
-                <button
-                  type="button"
-                  onClick={clearImage}
-                  className="font-mono text-xs text-[var(--orb-amber)] hover:opacity-70"
-                  aria-label="Remove reference"
-                >
-                  ×
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="rounded border border-border bg-black/40 px-3 py-1 font-mono text-xs text-muted-foreground hover:border-[var(--orb-amber)] hover:text-[var(--orb-amber)]"
-              >
-                + REF IMAGE
-              </button>
-            )}
             <label className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-              ASPECT
+              FRAMES
               <select
-                value={aspect}
-                onChange={(e) => setAspect(e.target.value)}
+                value={frameCount}
+                onChange={(e) => setFrameCount(Number(e.target.value))}
                 className="rounded border border-border bg-black/40 px-2 py-1 text-foreground focus:border-[var(--orb-amber)] focus:outline-none"
               >
-                <option value="16:9">16:9</option>
-                <option value="9:16">9:16</option>
-                <option value="1:1">1:1</option>
+                {[2, 3, 4, 5, 6].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
               </select>
             </label>
             <label className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-              DURATION
+              FPS
               <select
-                value={duration}
-                onChange={(e) => setDuration(Number(e.target.value))}
+                value={fps}
+                onChange={(e) => setFps(Number(e.target.value))}
                 className="rounded border border-border bg-black/40 px-2 py-1 text-foreground focus:border-[var(--orb-amber)] focus:outline-none"
               >
-                <option value={5}>5s</option>
-                <option value={10}>10s</option>
+                {[2, 4, 6, 8, 12].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
               </select>
             </label>
             <button
@@ -218,7 +131,7 @@ function Coolmation() {
               disabled={busy || !prompt.trim()}
               className="ml-auto h-10 rounded-full border border-[var(--orb-amber)]/60 bg-[var(--orb-orange)]/20 px-5 font-mono text-xs tracking-widest text-[var(--orb-amber)] transition-all hover:bg-[var(--orb-orange)]/40 disabled:opacity-40"
             >
-              {busy ? "SUBMITTING…" : "GENERATE"}
+              {busy ? "RENDERING…" : "GENERATE"}
             </button>
           </div>
           {error && (
@@ -233,39 +146,68 @@ function Coolmation() {
             </p>
           )}
           {clips.map((c) => (
-            <article key={c.id} className="rounded-lg border border-border bg-card/40 p-3 backdrop-blur-sm">
-              <div className="mb-2 flex items-center justify-between font-mono text-[10px] tracking-widest">
-                <div className="flex items-center gap-2 max-w-[70%]">
-                  {c.refUrl && (
-                    <img src={c.refUrl} alt="ref" className="h-6 w-6 rounded object-cover border border-[var(--orb-amber)]/40" />
-                  )}
-                  <span className="text-muted-foreground truncate">{c.prompt}</span>
-                </div>
-                <span
-                  className={
-                    c.status === "completed"
-                      ? "text-[var(--orb-amber)]"
-                      : c.status === "failed"
-                        ? "text-destructive"
-                        : "text-muted-foreground animate-pulse"
-                  }
-                >
-                  {c.status.toUpperCase()}
-                </span>
-              </div>
-              {c.status === "completed" && c.url ? (
-                <video src={c.url} controls playsInline className="w-full rounded-md" />
-              ) : c.status === "failed" ? (
-                <p className="font-mono text-xs text-destructive">{c.error || "Generation failed"}</p>
-              ) : (
-                <div className="flex aspect-video w-full items-center justify-center rounded-md border border-dashed border-border font-mono text-xs text-muted-foreground">
-                  RENDERING…
-                </div>
-              )}
-            </article>
+            <ClipCard key={c.id} clip={c} />
           ))}
         </section>
       </div>
     </div>
+  );
+}
+
+function ClipCard({ clip }: { clip: Clip }) {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (clip.status !== "completed" || clip.frames.length < 2) return;
+    const period = Math.max(60, Math.round(1000 / clip.fps));
+    const t = window.setInterval(() => {
+      setIdx((i) => (i + 1) % clip.frames.length);
+    }, period);
+    return () => window.clearInterval(t);
+  }, [clip.status, clip.frames, clip.fps]);
+
+  return (
+    <article className="rounded-lg border border-border bg-card/40 p-3 backdrop-blur-sm">
+      <div className="mb-2 flex items-center justify-between gap-3 font-mono text-[10px] tracking-widest">
+        <span className="text-muted-foreground truncate">{clip.prompt}</span>
+        <span
+          className={
+            clip.status === "completed"
+              ? "text-[var(--orb-amber)]"
+              : clip.status === "failed"
+                ? "text-destructive"
+                : "text-muted-foreground animate-pulse"
+          }
+        >
+          {clip.status === "completed"
+            ? `${clip.frames.length}F · ${clip.fps}FPS`
+            : clip.status.toUpperCase()}
+        </span>
+      </div>
+      {clip.status === "completed" && clip.frames.length > 0 ? (
+        <div className="relative w-full overflow-hidden rounded-md">
+          <img
+            src={clip.frames[idx]}
+            alt={`frame ${idx + 1}`}
+            className="w-full"
+          />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center gap-1 p-2">
+            {clip.frames.map((_, i) => (
+              <span
+                key={i}
+                className={`h-1 w-4 rounded-full transition-colors ${
+                  i === idx ? "bg-[var(--orb-amber)]" : "bg-white/20"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      ) : clip.status === "failed" ? (
+        <p className="font-mono text-xs text-destructive">{clip.error || "Generation failed"}</p>
+      ) : (
+        <div className="flex aspect-video w-full items-center justify-center rounded-md border border-dashed border-border font-mono text-xs text-muted-foreground">
+          RENDERING {clip.frameCount} FRAMES…
+        </div>
+      )}
+    </article>
   );
 }
