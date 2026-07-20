@@ -33,6 +33,13 @@ function parseComponents(analysis: string): Part[] {
   return parts;
 }
 
+function parseDiagnosis(analysis: string): string[] {
+  const index = analysis.toUpperCase().indexOf("DIAGNOSIS:");
+  if (index === -1) return [];
+  const body = analysis.slice(index + 10).trim();
+  return body.split("\n").map(l => l.trim()).filter(l => l && !l.toUpperCase().startsWith("COMPONENTS:"));
+}
+
 function DefaultModel({ troubleshooting }: { troubleshooting: boolean }) {
   const ref = useRef<THREE.Group>(null);
   useFrame((s) => {
@@ -61,18 +68,18 @@ function GeneratedModel({ parts, troubleshooting }: { parts: Part[]; troubleshoo
 
   const flat = useMemo(() => {
     const items: { kind: Part["kind"]; pos: [number, number, number] }[] = [];
-    let x = -2;
+    let x = -1.5;
     let y = -0.5;
     parts.forEach((p, pi) => {
       for (let i = 0; i < p.count; i++) {
-        const col = i % 4;
-        const row = Math.floor(i / 4);
+        const col = i % 3;
+        const row = Math.floor(i / 3);
         items.push({
           kind: p.kind,
-          pos: [x + col * 0.6, y + row * 0.7, (pi % 3) * 0.6 - 0.6],
+          pos: [x + col * 0.8, y + row * 0.8, (pi % 2) * 0.8 - 0.4],
         });
       }
-      x += 0.15;
+      x += 0.2;
     });
     return items;
   }, [parts]);
@@ -84,10 +91,10 @@ function GeneratedModel({ parts, troubleshooting }: { parts: Part[]; troubleshoo
       {flat.map((it, i) => (
         <mesh key={i} position={it.pos}>
           {it.kind === "cylinder" && <cylinderGeometry args={[0.15, 0.15, 1.2, 16]} />}
-          {it.kind === "box" && <boxGeometry args={[0.5, 0.15, 0.5]} />}
-          {it.kind === "sphere" && <sphereGeometry args={[0.2, 16, 16]} />}
-          {it.kind === "cone" && <coneGeometry args={[0.25, 0.6, 16]} />}
-          <meshStandardMaterial color={color} wireframe transparent opacity={0.75} />
+          {it.kind === "box" && <boxGeometry args={[0.6, 0.2, 0.6]} />}
+          {it.kind === "sphere" && <sphereGeometry args={[0.25, 16, 16]} />}
+          {it.kind === "cone" && <coneGeometry args={[0.3, 0.7, 16]} />}
+          <meshStandardMaterial color={color} wireframe transparent opacity={0.8} />
         </mesh>
       ))}
     </group>
@@ -97,6 +104,7 @@ function GeneratedModel({ parts, troubleshooting }: { parts: Part[]; troubleshoo
 export function EngineeringLab({ command }: { command?: { prompt: string; seq: number } }) {
   const [troubleshooting, setTroubleshooting] = useState(false);
   const [parts, setParts] = useState<Part[]>([]);
+  const [diagnosis, setDiagnosis] = useState<string[]>([]);
   const [analysis, setAnalysis] = useState("");
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -108,10 +116,6 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
 
   const runVision = useCallback(async (promptText: string) => {
     const img = pendingImageRef.current;
-    if (!img) {
-      setErr("Attach an image first");
-      return;
-    }
     setBusy(true);
     setErr(null);
     setAnalysis("");
@@ -119,7 +123,10 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
       const res = await fetch("/api/vision", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [img], prompt: promptText }),
+        body: JSON.stringify({ 
+            images: img ? [img] : [], 
+            prompt: promptText 
+        }),
       });
       if (!res.ok || !res.body) throw new Error(`Vision ${res.status}`);
       let full = "";
@@ -143,8 +150,14 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
         parser.feed(value);
       }
       const p = parseComponents(full);
-      if (p.length) setParts(p);
-      else setErr("Could not parse components from analysis");
+      const d = parseDiagnosis(full);
+      if (p.length) {
+          setParts(p);
+          setDiagnosis(d);
+          if (d.length) setTroubleshooting(true);
+      } else {
+          setErr("Could not extract build components. Try a different prompt.");
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Vision failed");
     } finally {
@@ -165,23 +178,19 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
     };
     if (imageUrl) URL.revokeObjectURL(imageUrl);
     setImageUrl(URL.createObjectURL(file));
-    void runVision(prompt.trim() || "Analyze this structure for a 3D rebuild.");
-  }, [imageUrl, prompt, runVision]);
+    void runVision("Analyze this image and build a 3D plan with parts and diagnosis.");
+  }, [imageUrl, runVision]);
 
   useEffect(() => {
     if (!command || command.seq === lastSeqRef.current) return;
     lastSeqRef.current = command.seq;
-    if (!pendingImageRef.current) {
-      setErr("No image attached — drop one in first.");
-      return;
-    }
-    void runVision(command.prompt || "Rebuild the structure from the image.");
+    void runVision(command.prompt || "Rebuild the structure with a new parts list and error check.");
   }, [command, runVision]);
 
   return (
     <div className="w-full h-full relative bg-black/40 rounded-3xl overflow-hidden border border-[#00f2ff]/20 backdrop-blur-md flex flex-col">
       <div className="absolute top-4 left-4 z-10 font-mono text-[10px] tracking-widest text-[#00f2ff] opacity-80">
-        NEXUS // ENGINEERING LAB v1.1
+        NEXUS // HOLOGRAPHIC LAB v2.0
       </div>
 
       <div className="absolute top-4 right-4 z-10 flex gap-2">
@@ -193,7 +202,7 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
               : "border-[#00f2ff]/40 text-[#00f2ff] hover:bg-[#00f2ff]/10"
           }`}
         >
-          {troubleshooting ? "STOP DIAGNOSIS" : "SCAN FOR ERRORS"}
+          {troubleshooting ? "EXIT DIAGNOSIS" : "SCAN FOR ERRORS"}
         </button>
       </div>
 
@@ -203,9 +212,19 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
         </div>
       )}
 
-      {(busy || analysis) && (
+      {troubleshooting && diagnosis.length > 0 && (
+          <div className="absolute top-12 left-4 z-20 max-w-[80%] space-y-2 pointer-events-none">
+              {diagnosis.map((d, i) => (
+                  <div key={i} className="font-mono text-[10px] text-red-400 bg-black/80 p-2 border-l-2 border-red-500 animate-in slide-in-from-left duration-300">
+                      ! {d}
+                  </div>
+              ))}
+          </div>
+      )}
+
+      {(busy || analysis) && !troubleshooting && (
         <div className="absolute top-12 left-4 z-10 max-w-[55%] max-h-[45%] overflow-auto font-mono text-[9px] text-[#00f2ff]/80 bg-black/50 p-2 rounded border border-[#00f2ff]/20 whitespace-pre-wrap">
-          {busy && !analysis ? "ANALYZING STRUCTURE…" : analysis}
+          {busy && !analysis ? "BUILDING HOLOGRAPHIC MODEL…" : analysis}
         </div>
       )}
 
@@ -217,18 +236,18 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
 
       <div className="flex-1 min-h-0">
         <Canvas>
-          <PerspectiveCamera makeDefault position={[0, 1, 5]} />
+          <PerspectiveCamera makeDefault position={[0, 1, 6]} />
           <OrbitControls enableZoom={true} enablePan={false} />
           <ambientLight intensity={0.5} />
           <pointLight position={[10, 10, 10]} intensity={1} color="#00f2ff" />
-          <Float speed={2} rotationIntensity={0.3} floatIntensity={0.3}>
+          <Float speed={3} rotationIntensity={0.5} floatIntensity={0.5}>
             {parts.length > 0 ? (
               <GeneratedModel parts={parts} troubleshooting={troubleshooting} />
             ) : (
               <DefaultModel troubleshooting={troubleshooting} />
             )}
           </Float>
-          <gridHelper args={[10, 20, "#00f2ff", "#00f2ff"]} position={[0, -1, 0]} />
+          <gridHelper args={[20, 40, "#00f2ff", "#00f2ff"]} position={[0, -1.5, 0]} opacity={0.1} transparent />
         </Canvas>
       </div>
 
@@ -250,24 +269,24 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
           disabled={busy}
           className="shrink-0 px-3 h-9 font-mono text-[10px] border border-[#00f2ff]/40 text-[#00f2ff] hover:bg-[#00f2ff]/10 disabled:opacity-40"
         >
-          + IMAGE
+          + REF
         </button>
         <form
           className="flex flex-1 items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            void runVision(prompt.trim() || "Analyze this structure for a 3D rebuild.");
+            void runVision(prompt.trim() || "Rebuild this build with full structural analysis.");
           }}
         >
           <input
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder={imageUrl ? "Describe how to rebuild…" : "Attach an image to rebuild the 3D model…"}
+            placeholder="Describe what to build or fix…"
             className="flex-1 h-9 bg-black/50 border border-[#00f2ff]/30 px-3 font-mono text-[11px] text-[#00f2ff] placeholder:text-[#00f2ff]/40 focus:outline-none focus:border-[#00f2ff]"
           />
           <button
             type="submit"
-            disabled={busy || !imageUrl}
+            disabled={busy}
             className="shrink-0 px-3 h-9 font-mono text-[10px] border border-[#00f2ff]/60 bg-[#00f2ff]/10 text-[#00f2ff] hover:bg-[#00f2ff]/20 disabled:opacity-40"
           >
             {busy ? "…" : "REBUILD"}
