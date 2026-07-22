@@ -28,7 +28,10 @@ export const Route = createFileRoute("/api/chat")({
             "4. NEXUS COOLMATION (Image/Video Generation): describe what you will generate, then emit a tag:\n" +
             "   - [[ACT:GENERATE_IMAGE|prompt|ref_urls|style_url]]\n" +
             "   - [[ACT:GENERATE_VIDEO|prompt|ref_urls|style_url]]\n" +
-            "5. UNIVERSAL APP INTEGRATION: Alan can connect any app (Discord, Gmail, etc.) through his Wingman. Act on them via tag: [[ACT:APP_ACTION|appName|instruction]].\n\n" +
+            "5. PHONE & VOICE AUTOMATION: NEXUS can now make calls. Describe the call objective, then emit a tag:\n" +
+            "   - [[ACT:PHONE_CALL|phoneNumber|objective]]\n" +
+            "   Example: 'Calling the store to check availability...' [[ACT:PHONE_CALL|+1234567890|Check if they have the new iPad in stock]].\n" +
+            "6. UNIVERSAL APP INTEGRATION: Alan can connect any app (Discord, Gmail, etc.) through his Wingman. Act on them via tag: [[ACT:APP_ACTION|appName|instruction]].\n\n" +
             "Knowledge: Alan is a student in Florida. Recent Universal trip (July 10-12). \n" +
             "Style: Calm, precise, measured. Be concise (1-3 sentences). No markdown. Output is spoken aloud.",
         };
@@ -40,7 +43,7 @@ export const Route = createFileRoute("/api/chat")({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ 
-            model: "google/gemini-3-flash-preview",
+            model: "google/gemini-2.0-flash-exp",
             messages: [system, ...incomingMessages],
             stream: false,
           }),
