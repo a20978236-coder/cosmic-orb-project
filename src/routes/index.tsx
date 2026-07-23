@@ -7,10 +7,10 @@ import { EngineeringLab } from "@/components/EngineeringLab";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "NEXUS — Advanced AI" },
-      { name: "description", content: "An advanced voice-first AI assistant." },
-      { property: "og:title", content: "NEXUS — Advanced AI" },
-      { property: "og:description", content: "An advanced voice-first AI assistant." },
+      { title: "NEXUS — Emergent Power by Wingman" },
+      { name: "description", content: "An advanced voice-first AI assistant powered by Emergent." },
+      { property: "og:title", content: "NEXUS — Emergent Power by Wingman" },
+      { property: "og:description", content: "An advanced voice-first AI assistant powered by Emergent." },
     ],
   }),
   component: Index,
@@ -305,8 +305,8 @@ function Index() {
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-2 w-2 rounded-full bg-[var(--orb-amber)] shadow-[0_0_10px_var(--orb-amber)]" />
-            <h1 className="font-mono text-sm tracking-[0.4em] text-[var(--orb-amber)]">
-              N E X U S
+            <h1 className="font-mono text-sm tracking-[0.4em] text-[var(--orb-amber)] uppercase">
+              Nexus: Emergent Power
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -336,8 +336,8 @@ function Index() {
 
         <section className="mb-4 max-h-56 overflow-y-auto rounded-lg border border-border bg-card/40 p-4 backdrop-blur-sm">
           {messages.length === 0 && !streaming && (
-            <p className="text-center font-mono text-xs tracking-widest text-muted-foreground">
-              SYSTEM ONLINE — SPEAK OR TYPE TO BEGIN
+            <p className="text-center font-mono text-xs tracking-widest text-muted-foreground uppercase">
+              System Online — Powered by Wingman
             </p>
           )}
           <ul className="space-y-3">
@@ -388,7 +388,7 @@ function Index() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Address NEXUS…"
+              placeholder="Address NEXUS Emergent…"
               disabled={orbState !== "idle" && orbState !== "listening"}
               className="h-12 w-full rounded-full border border-border bg-card/60 px-5 font-mono text-sm tracking-wide text-foreground placeholder:text-muted-foreground/60 focus:border-[var(--orb-amber)] focus:outline-none disabled:opacity-50"
             />
