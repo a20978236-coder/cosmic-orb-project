@@ -6,7 +6,7 @@ export const Route = createFileRoute("/api/chat")({
       POST: async ({ request }) => {
         const body = await request.json();
         const key = process.env.LOVABLE_API_KEY;
-        
+
         if (!key) {
           return new Response("Missing API Key", { status: 500 });
         }
@@ -26,36 +26,30 @@ export const Route = createFileRoute("/api/chat")({
           "Knowledge: Alan is a student in Florida. Recent Universal trip (July 10-12). \n" +
           "Style: Calm, precise, measured. No markdown. Output is spoken aloud.";
 
-        const systemMessage = { role: "system", content: systemContent };
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-1.5-flash",
+            messages: [{ role: "system", content: systemContent }, ...messages],
+            stream: false,
+          }),
+        });
 
-        try {
-          const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${key}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "gpt-4o",
-              messages: [systemMessage, ...messages],
-              stream: false,
-            }),
-          });
-
-          if (!upstream.ok) {
-            const errorText = await upstream.text();
-            return new Response(`Upstream Error: ${errorText}`, { status: upstream.status });
-          }
-
-          const data = await upstream.json();
-          const reply = data.choices?.[0]?.message?.content || "Evolution in progress.";
-
-          return new Response(reply, {
-            headers: { "Content-Type": "text/plain" },
-          });
-        } catch (err) {
-          return new Response(`Server Error: ${err instanceof Error ? err.message : 'Unknown' }`, { status: 500 });
+        if (!response.ok) {
+          const errorText = await response.text();
+          return new Response(errorText, { status: response.status });
         }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content || "Evolution in progress.";
+
+        return new Response(content, {
+          headers: { "Content-Type": "text/plain" },
+        });
       },
     },
   },
