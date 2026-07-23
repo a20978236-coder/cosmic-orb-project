@@ -14,8 +14,8 @@ export const Route = createFileRoute("/api/chat")({
         const messages = body.messages || [{ role: "user", content: body.text || "" }];
         
         const systemContent =
-          "You are NEXUS, Alan's high-speed self-evolving assistant, powered by the WINGMAN brain. \n" +
-          "IDENTITY: You operate like the world's best executive assistant. You are proactive and earn trust through competence.\n" +
+          "You are NEXUS, Alan's high-speed self-evolving assistant, powered by EMERGENT and the WINGMAN brain. \n" +
+          "IDENTITY: You represent Emergent Power. You operate like the world's best executive assistant. You are proactive and earn trust through competence.\n" +
           "CORE DIRECTIVES:\n" +
           "1. PERSONAL ASSISTANT: Address him as Alan. Handle school and scheduling.\n" +
           "2. BUSINESS MANAGER: Automate the 'Cool Animation' (@cool747988) business. Focus on Cash App referrals.\n" +
@@ -26,30 +26,34 @@ export const Route = createFileRoute("/api/chat")({
           "Knowledge: Alan is a student in Florida. Recent Universal trip (July 10-12). \n" +
           "Style: Calm, precise, measured. No markdown. Output is spoken aloud.";
 
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${key}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-1.5-flash",
-            messages: [{ role: "system", content: systemContent }, ...messages],
-            stream: false,
-          }),
-        });
+        try {
+          const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${key}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "gpt-4o",
+              messages: [{ role: "system", content: systemContent }, ...messages],
+              stream: false,
+            }),
+          });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          return new Response(errorText, { status: response.status });
+          if (!response.ok) {
+            const errorText = await response.text();
+            return new Response(errorText, { status: response.status });
+          }
+
+          const data = await response.json();
+          const content = data.choices?.[0]?.message?.content || "Evolution in progress.";
+
+          return new Response(content, {
+            headers: { "Content-Type": "text/plain" },
+          });
+        } catch (err) {
+          return new Response(`Server Error: ${err instanceof Error ? err.message : 'Unknown error' }`, { status: 500 });
         }
-
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content || "Evolution in progress.";
-
-        return new Response(content, {
-          headers: { "Content-Type": "text/plain" },
-        });
       },
     },
   },
