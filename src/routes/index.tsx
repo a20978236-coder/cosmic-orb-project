@@ -98,6 +98,13 @@ function Index() {
         body: JSON.stringify({ text }),
       });
       if (!res.ok || !res.body) {
+        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+          const u = new SpeechSynthesisUtterance(text.replace(/\[\[ACT:[^\]]+\]\]/g, "").trim());
+          u.onend = () => setOrbState("idle");
+          u.onerror = () => setOrbState("idle");
+          window.speechSynthesis.speak(u);
+          return;
+        }
         setError(`TTS failed (${res.status})`);
         setOrbState("idle");
         return;
