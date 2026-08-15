@@ -247,7 +247,7 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
               <DefaultModel troubleshooting={troubleshooting} />
             )}
           </Float>
-          <gridHelper args={[20, 40, "#00f2ff", "#00f2ff"]} position={[0, -1.5, 0]} opacity={0.1} transparent />
+          <gridHelper args={[20, 40, "#00f2ff", "#00f2ff"]} position={[0, -1.5, 0]} />
         </Canvas>
       </div>
 
