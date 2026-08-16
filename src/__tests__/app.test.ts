@@ -1,4 +1,5 @@
 import { describe, it, expect } from "bun:test";
+import { parseComponents, parseDiagnosis } from "../lib/engineering-parser";
 
 describe("Cosmic Orb Core Logic & Action Parser", () => {
   it("should extract actions from NEXUS assistant responses correctly", () => {
@@ -9,7 +10,8 @@ describe("Cosmic Orb Core Logic & Action Parser", () => {
   });
 
   it("should parse parametric rebuild actions with instructions", () => {
-    const text = "Applying reinforcement. [[ACT:REBUILD|carbon-fiber-reinforce-truss]] Structural integrity nominal.";
+    const text =
+      "Applying reinforcement. [[ACT:REBUILD|carbon-fiber-reinforce-truss]] Structural integrity nominal.";
     const match = text.match(/\[\[ACT:REBUILD\|([^\]]+)\]\]/);
     expect(match).not.toBeNull();
     expect(match![1]).toBe("carbon-fiber-reinforce-truss");
@@ -27,5 +29,43 @@ describe("Cosmic Orb Core Logic & Action Parser", () => {
     const sseChunk = `data: ${payload}\n\n`;
     expect(sseChunk.startsWith("data: ")).toBe(true);
     expect(sseChunk.endsWith("\n\n")).toBe(true);
+  });
+});
+
+describe("Engineering Lab Component & Diagnosis Parsers", () => {
+  it("should parse components string into structured 3D parts", () => {
+    const analysis = `
+ANALYSIS: Structural load distribution verified.
+COMPONENTS: 4 carbon pillars, 2 support deck, 6 joint nodes, 1 exhaust nozzle
+DIAGNOSIS:
+Tension exceeds threshold on lower brackets.
+    `.trim();
+
+    const parts = parseComponents(analysis);
+    expect(parts.length).toBe(4);
+    expect(parts[0]).toEqual({ kind: "cylinder", count: 4, label: "carbon pillars" });
+    expect(parts[1]).toEqual({ kind: "box", count: 2, label: "support deck" });
+    expect(parts[2]).toEqual({ kind: "sphere", count: 6, label: "joint nodes" });
+    expect(parts[3]).toEqual({ kind: "cone", count: 1, label: "exhaust nozzle" });
+  });
+
+  it("should extract diagnosis points from analysis text", () => {
+    const analysis = `
+COMPONENTS: 2 pillar
+DIAGNOSIS:
+Shear stress at node 4
+Oscillation frequency mismatch
+    `.trim();
+
+    const diagnosis = parseDiagnosis(analysis);
+    expect(diagnosis.length).toBe(2);
+    expect(diagnosis[0]).toBe("Shear stress at node 4");
+    expect(diagnosis[1]).toBe("Oscillation frequency mismatch");
+  });
+
+  it("should return empty arrays gracefully when sections are absent", () => {
+    const emptyAnalysis = "Just general telemetry text with no markers.";
+    expect(parseComponents(emptyAnalysis)).toEqual([]);
+    expect(parseDiagnosis(emptyAnalysis)).toEqual([]);
   });
 });
