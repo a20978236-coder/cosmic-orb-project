@@ -11,9 +11,7 @@ type Part = {
 };
 
 function parseComponents(analysis: string): Part[] {
-  const line = analysis
-    .split("\n")
-    .find((l) => l.toUpperCase().startsWith("COMPONENTS:"));
+  const line = analysis.split("\n").find((l) => l.toUpperCase().startsWith("COMPONENTS:"));
   if (!line) return [];
   const body = line.slice(line.indexOf(":") + 1).trim();
   const parts: Part[] = [];
@@ -37,7 +35,10 @@ function parseDiagnosis(analysis: string): string[] {
   const index = analysis.toUpperCase().indexOf("DIAGNOSIS:");
   if (index === -1) return [];
   const body = analysis.slice(index + 10).trim();
-  return body.split("\n").map(l => l.trim()).filter(l => l && !l.toUpperCase().startsWith("COMPONENTS:"));
+  return body
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.toUpperCase().startsWith("COMPONENTS:"));
 }
 
 function DefaultModel({ troubleshooting }: { troubleshooting: boolean }) {
@@ -69,7 +70,7 @@ function GeneratedModel({ parts, troubleshooting }: { parts: Part[]; troubleshoo
   const flat = useMemo(() => {
     const items: { kind: Part["kind"]; pos: [number, number, number] }[] = [];
     let x = -1.5;
-    let y = -0.5;
+    const y = -0.5;
     parts.forEach((p, pi) => {
       for (let i = 0; i < p.count; i++) {
         const col = i % 3;
@@ -123,9 +124,9 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
       const res = await fetch("/api/vision", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-            images: img ? [img] : [], 
-            prompt: promptText 
+        body: JSON.stringify({
+          images: img ? [img] : [],
+          prompt: promptText,
         }),
       });
       if (!res.ok || !res.body) throw new Error(`Vision ${res.status}`);
@@ -140,7 +141,9 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
               full += delta;
               setAnalysis(full);
             }
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         },
       });
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -152,11 +155,11 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
       const p = parseComponents(full);
       const d = parseDiagnosis(full);
       if (p.length) {
-          setParts(p);
-          setDiagnosis(d);
-          if (d.length) setTroubleshooting(true);
+        setParts(p);
+        setDiagnosis(d);
+        if (d.length) setTroubleshooting(true);
       } else {
-          setErr("Could not extract build components. Try a different prompt.");
+        setErr("Could not extract build components. Try a different prompt.");
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Vision failed");
@@ -165,21 +168,24 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
     }
   }, []);
 
-  const onFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith("image/")) return;
-    const buf = await file.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    let bin = "";
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    pendingImageRef.current = {
-      base64: btoa(bin),
-      mimeType: file.type,
-      name: file.name,
-    };
-    if (imageUrl) URL.revokeObjectURL(imageUrl);
-    setImageUrl(URL.createObjectURL(file));
-    void runVision("Analyze this image and build a 3D plan with parts and diagnosis.");
-  }, [imageUrl, runVision]);
+  const onFile = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith("image/")) return;
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let bin = "";
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      pendingImageRef.current = {
+        base64: btoa(bin),
+        mimeType: file.type,
+        name: file.name,
+      };
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+      setImageUrl(URL.createObjectURL(file));
+      void runVision("Analyze this image and build a 3D plan with parts and diagnosis.");
+    },
+    [imageUrl, runVision]
+  );
 
   useEffect(() => {
     if (!command || command.seq === lastSeqRef.current) return;
@@ -213,13 +219,16 @@ export function EngineeringLab({ command }: { command?: { prompt: string; seq: n
       )}
 
       {troubleshooting && diagnosis.length > 0 && (
-          <div className="absolute top-12 left-4 z-20 max-w-[80%] space-y-2 pointer-events-none">
-              {diagnosis.map((d, i) => (
-                  <div key={i} className="font-mono text-[10px] text-red-400 bg-black/80 p-2 border-l-2 border-red-500 animate-in slide-in-from-left duration-300">
-                      ! {d}
-                  </div>
-              ))}
-          </div>
+        <div className="absolute top-12 left-4 z-20 max-w-[80%] space-y-2 pointer-events-none">
+          {diagnosis.map((d, i) => (
+            <div
+              key={i}
+              className="font-mono text-[10px] text-red-400 bg-black/80 p-2 border-l-2 border-red-500 animate-in slide-in-from-left duration-300"
+            >
+              ! {d}
+            </div>
+          ))}
+        </div>
       )}
 
       {(busy || analysis) && !troubleshooting && (
