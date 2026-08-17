@@ -40,6 +40,7 @@ The application utilizes TanStack Start file-based routing in `src/routes/`:
 - `engineering-parser.ts`: Diagnostics and 3D sub-component parser.
 - `error-capture.ts`: Global exception interceptor and telemetry logger.
 - `lovable-error-reporting.ts`: Sync handler for Lovable integration.
+- `utils.ts`: Tailwind class utility (`cn`).
 
 ---
 
@@ -60,7 +61,7 @@ bun run dev
 
 ### Verification & Quality Gates
 ```bash
-# Run unit test suite
+# Run unit test suite (10/10 tests)
 bun test
 
 # Run TypeScript typecheck
@@ -77,14 +78,18 @@ bun run format
 
 ## 🧪 Testing
 
-The repository features automated unit tests in `src/__tests__/app.test.ts` validating:
-- API response contract and SSE streaming fallbacks
-- Engineering diagnostics and component parsing
-- Route registration and telemetry integrity
+The repository features 10 automated unit tests in `src/__tests__/app.test.ts` validating:
+- API response contract and SSE streaming fallbacks (`/api/chat`, `/api/tts`)
+- Engineering diagnostics and 3D sub-component parsing bounds (`[1, 12]`)
+- Global error capture queue and telemetry integrity
+- Styling and class name utility merging (`cn`)
+- File-based route definitions and integrity
+
+For detailed quality verification and CI/CD status, refer to [docs/ci-cd-health.md](docs/ci-cd-health.md).
 
 ---
 
-## ⚙️ Lovable Integration Rules
+## ⚡ Lovable Integration Rules
 
 This repository is synchronized with Lovable.
 - Avoid rewriting published Git history (`git push --force`, rebase/amend on synced branches).
