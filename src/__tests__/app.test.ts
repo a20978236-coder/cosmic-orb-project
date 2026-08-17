@@ -1,5 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { parseComponents, parseDiagnosis } from "../lib/engineering-parser";
+import { cn } from "../lib/utils";
+import { consumeLastCapturedError } from "../lib/error-capture";
 
 describe("Cosmic Orb Core Logic & Action Parser", () => {
   it("should extract actions from NEXUS assistant responses correctly", () => {
@@ -49,6 +51,14 @@ Tension exceeds threshold on lower brackets.
     expect(parts[3]).toEqual({ kind: "cone", count: 1, label: "exhaust nozzle" });
   });
 
+  it("should cap count between 1 and 12 for components", () => {
+    const analysis = "COMPONENTS: 50 pillars, 0 deck, -3 joints";
+    const parts = parseComponents(analysis);
+    expect(parts[0].count).toBe(12);
+    expect(parts[1].count).toBe(1);
+    expect(parts[2].count).toBe(1);
+  });
+
   it("should extract diagnosis points from analysis text", () => {
     const analysis = `
 COMPONENTS: 2 pillar
@@ -67,5 +77,18 @@ Oscillation frequency mismatch
     const emptyAnalysis = "Just general telemetry text with no markers.";
     expect(parseComponents(emptyAnalysis)).toEqual([]);
     expect(parseDiagnosis(emptyAnalysis)).toEqual([]);
+  });
+});
+
+describe("Core Utilities & Error Handling", () => {
+  it("should merge tailwind class names with cn utility", () => {
+    expect(cn("px-2 py-1", "bg-blue-500", { "text-white": true, "opacity-50": false })).toBe(
+      "px-2 py-1 bg-blue-500 text-white",
+    );
+    expect(cn("px-2", "px-4")).toBe("px-4");
+  });
+
+  it("should handle error capture queue consumption gracefully", () => {
+    expect(consumeLastCapturedError()).toBeUndefined();
   });
 });
