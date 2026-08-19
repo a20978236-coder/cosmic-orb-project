@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test";
 import { parseComponents, parseDiagnosis } from "../lib/engineering-parser";
 import { cn } from "../lib/utils";
 import { consumeLastCapturedError } from "../lib/error-capture";
+import { renderErrorPage } from "../lib/error-page";
 
 describe("Cosmic Orb Core Logic & Action Parser", () => {
   it("should extract actions from NEXUS assistant responses correctly", () => {
@@ -90,5 +91,13 @@ describe("Core Utilities & Error Handling", () => {
 
   it("should handle error capture queue consumption gracefully", () => {
     expect(consumeLastCapturedError()).toBeUndefined();
+  });
+
+  it("should render fallback error page HTML structure with recovery actions", () => {
+    const html = renderErrorPage();
+    expect(html).toContain("<!doctype html>");
+    expect(html).toContain("This page didn't load");
+    expect(html).toContain("location.reload()");
+    expect(html).toContain('href="/"');
   });
 });
