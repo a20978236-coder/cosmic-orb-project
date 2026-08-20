@@ -3,6 +3,7 @@ import { parseComponents, parseDiagnosis } from "../lib/engineering-parser";
 import { cn } from "../lib/utils";
 import { consumeLastCapturedError } from "../lib/error-capture";
 import { renderErrorPage } from "../lib/error-page";
+import { reportLovableError } from "../lib/lovable-error-reporting";
 
 describe("Cosmic Orb Core Logic & Action Parser", () => {
   it("should extract actions from NEXUS assistant responses correctly", () => {
@@ -60,6 +61,13 @@ Tension exceeds threshold on lower brackets.
     expect(parts[2].count).toBe(1);
   });
 
+  it("should fallback to box kind when component label is unknown", () => {
+    const analysis = "COMPONENTS: 3 mysterious gizmo";
+    const parts = parseComponents(analysis);
+    expect(parts.length).toBe(1);
+    expect(parts[0]).toEqual({ kind: "box", count: 3, label: "mysterious gizmo" });
+  });
+
   it("should extract diagnosis points from analysis text", () => {
     const analysis = `
 COMPONENTS: 2 pillar
@@ -91,6 +99,44 @@ describe("Core Utilities & Error Handling", () => {
 
   it("should handle error capture queue consumption gracefully", () => {
     expect(consumeLastCapturedError()).toBeUndefined();
+  });
+
+  it("should capture unhandled error events dispatched on globalThis", () => {
+    const testError = new Error("Global event listener capture test");
+    globalThis.dispatchEvent(new ErrorEvent("error", { error: testError }));
+    const captured = consumeLastCapturedError();
+    expect(captured).toBe(testError);
+  });
+
+  it("should report errors to window.__lovableEvents when window is present", () => {
+    let capturedPayload: {
+      error: unknown;
+      context?: Record<string, unknown>;
+      options?: unknown;
+    } | null = null;
+    (globalThis as unknown as { window: unknown }).window = {
+      location: { pathname: "/engineering-lab" },
+      __lovableEvents: {
+        captureException: (
+          error: unknown,
+          context?: Record<string, unknown>,
+          options?: unknown,
+        ) => {
+          capturedPayload = { error, context, options };
+        },
+      },
+    };
+
+    const boundaryError = new Error("Test react error boundary");
+    reportLovableError(boundaryError, { component: "EngineeringLab" });
+
+    expect(capturedPayload).not.toBeNull();
+    expect(capturedPayload!.error).toBe(boundaryError);
+    expect(capturedPayload!.context?.route).toBe("/engineering-lab");
+    expect(capturedPayload!.context?.component).toBe("EngineeringLab");
+    expect((capturedPayload!.options as { severity?: string })?.severity).toBe("error");
+
+    delete (globalThis as unknown as { window?: unknown }).window;
   });
 
   it("should render fallback error page HTML structure with recovery actions", () => {
