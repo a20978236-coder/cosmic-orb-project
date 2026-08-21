@@ -9,7 +9,7 @@ The repository enforces strict quality standards via Bun and npm scripts:
 
 | Check | Command | Description | Status |
 |---|---|---|---|
-| **Unit Tests** | `bun test` | Executes 11 unit tests in `src/__tests__/app.test.ts` (27 assertions) | ✅ 11/11 Passing |
+| **Unit Tests** | `bun test` | Executes 15 unit tests in `src/__tests__/app.test.ts` (31 assertions) | ✅ 15/15 Passing |
 | **Typecheck** | `bun run typecheck` | Strict TypeScript compilation (`tsc --noEmit`) | ✅ 0 Errors |
 | **Lint** | `bun run lint` | ESLint verification | ✅ 0 Warnings / Errors |
 | **Formatting** | `bun run format` | Prettier code style formatting | ✅ Clean |
@@ -20,9 +20,10 @@ The repository enforces strict quality standards via Bun and npm scripts:
    - `/api/tts` browser SpeechSynthesis fallback handling.
 2. **Core Modules & Parsers**:
    - `engineering-parser.ts`: JSON structure parsing, component bounding (`[1, 12]`), fallback handling.
-   - `error-capture.ts`: Global error queue and `consumeLastCapturedError()` handling.
+   - `error-capture.ts`: Global error queue and `consumeLastCapturedError()` handling via `globalThis` event dispatch.
+   - `lovable-error-reporting.ts`: Exception interceptor and `window.__lovableEvents` telemetry reporting.
    - `error-page.ts`: Fallback error page HTML rendering (`renderErrorPage()`) with interactive reload and navigation recovery actions.
-   - `utils.ts`: Tailwind class merging (`cn()` utility).
+   - `utils.ts`: Tailwind class merging (`cn()` utility) including complex conditional and conflicting class resolution.
 3. **Route Integrity**:
    - Route exports and file-based route definitions across all views.
 
