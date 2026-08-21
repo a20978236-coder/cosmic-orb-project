@@ -146,4 +146,16 @@ describe("Core Utilities & Error Handling", () => {
     expect(html).toContain("location.reload()");
     expect(html).toContain('href="/"');
   });
+
+  it("should verify cn utility handling of complex conditional and conflicting classes", () => {
+    const isPrimary = true;
+    const isLarge = false;
+    const result = cn(
+      "base-button text-sm font-medium",
+      isPrimary && "bg-amber-500 text-black",
+      isLarge ? "p-4 text-lg" : "p-2",
+      "hover:opacity-90",
+    );
+    expect(result).toBe("base-button text-sm font-medium bg-amber-500 text-black p-2 hover:opacity-90");
+  });
 });
