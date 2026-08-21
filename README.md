@@ -6,7 +6,7 @@ Connected to [Lovable](https://lovable.dev) for rapid iteration with full autono
 
 ---
 
-## 🛠 Tech Stack
+## 🛠️ Tech Stack
 
 - **Framework**: [TanStack Start](https://tanstack.com/start) with Nitro SSR
 - **UI & Components**: React 19, Tailwind CSS v4, Radix UI primitives, Lucide Icons
@@ -16,7 +16,7 @@ Connected to [Lovable](https://lovable.dev) for rapid iteration with full autono
 
 ---
 
-## 📂 Architecture & Routing
+## 🧭 Architecture & Routing
 
 The application utilizes TanStack Start file-based routing in `src/routes/`:
 
@@ -62,7 +62,7 @@ bun run dev
 
 ### Verification & Quality Gates
 ```bash
-# Run unit test suite (11/11 tests)
+# Run unit test suite (15/15 tests)
 bun test
 
 # Run TypeScript typecheck
@@ -79,12 +79,13 @@ bun run format
 
 ## 🧪 Testing
 
-The repository features 11 automated unit tests in `src/__tests__/app.test.ts` validating:
+The repository features 15 automated unit tests in `src/__tests__/app.test.ts` validating:
 - API response contract and SSE streaming fallbacks (`/api/chat`, `/api/tts`)
 - Engineering diagnostics and 3D sub-component parsing bounds (`[1, 12]`)
-- Global error capture queue and telemetry integrity
+- Global error capture queue and telemetry integrity (`consumeLastCapturedError`, `globalThis` error events)
+- Lovable error reporting and exception dispatch (`reportLovableError`, `window.__lovableEvents`)
 - Fallback error page HTML structure with recovery actions (`renderErrorPage`)
-- Styling and class name utility merging (`cn`)
+- Styling and class name utility merging (`cn` utility with conflicting/conditional class resolution)
 - File-based route definitions and integrity
 
 For detailed quality verification and CI/CD status, refer to [docs/ci-cd-health.md](docs/ci-cd-health.md).
